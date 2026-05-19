@@ -1,0 +1,331 @@
+---
+export const prerender = true;
+
+import fs from 'node:fs';
+import path from 'node:path';
+import Layout from '../../layouts/Layout.astro';
+import Navigation from '../../components/Navigation.astro';
+import { loadCardData } from '../../utils/loadCardData.js';
+import { loadSets, getSetMeta } from '../../utils/setData.js';
+import { getImageUrl, getImageSrcSet, escapeHtml, getTcgAffiliateUrl } from '../../utils/helpers.js';
+
+interface Card {
+  id: string;
+  name?: string;
+  displayName?: string;
+  slug?: string;
+  setId?: string;
+  rarity?: string;
+  type?: string;
+  cost?: number | null;
+  color?: string;
+  color2?: string;
+  ink?: number | null;
+  characteristics?: string[];
+  action?: string;
+  flavour?: string;
+  price?: number | null;
+  tcgPlayerId?: string;
+  title?: string;
+  strength?: number | null;
+  willpower?: number | null;
+  lore?: number | null;
+  delta7dPrice?: number | null;
+}
+
+interface SetMeta { id: string; slug: string; name: string; release: string | null; kind: string; cardsCount: number; }
+
+const hasSetLogo = (id: string) =>
+  fs.existsSync(path.join(process.cwd(), 'public', 'set-logos', `${id}.webp`));
+
+export async function getStaticPaths() {
+  const { cards } = await loadCardData();
+  const ids = cards
+    .map((c: Card) => c.setId)
+    .filter((id: string | undefined): id is string => Boolean(id));
+  const cardSetIds: string[] = [...new Set<string>(ids)];
+  // Generate a page for every set ID present in cards data — including
+  // override-only sets (e.g. 012 Wilds Unknown, 013 Attack of the Vine!)
+  // that aren't yet listed in /cgfw/getsets but have card data.
+  return cardSetIds.map(id => ({ params: { slug: getSetMeta(id).slug } }));
+}
+
+const { slug } = Astro.params;
+
+// Look up the set: API data first, then any unmapped sets via getSetMeta.
+const { sets } = loadSets();
+let setMeta = sets.find((s: SetMeta) => s.slug === slug);
+if (!setMeta) {
+  // Try matching against overrides / unmapped sets pulled from cards data.
+  const { cards: allCards } = await loadCardData() as { cards: Card[] };
+  const cardSetIds = [...new Set(allCards.map(c => c.setId).filter(Boolean) as string[])];
+  for (const id of cardSetIds) {
+    const meta = getSetMeta(id);
+    if (meta.slug === slug) {
+      setMeta = meta;
+      break;
+    }
+  }
+}
+if (!setMeta) {
+  return Astro.redirect('/404');
+}
+
+const { cards } = await loadCardData() as { cards: Card[] };
+
+// Cards from this set, sorted by card number (numeric portion of ID after the dash)
+const cardNumOf = (id: string) => {
+  const m = id.match(/-(\d+)/);
+  return m ? parseInt(m[1], 10) : 0;
+};
+const setCards = cards
+  .filter(c => c.setId === setMeta.id)
+  .sort((a, b) => cardNumOf(a.id) - cardNumOf(b.id));
+
+const totalCards = setCards.length;
+
+// Type counts for the description
+const typeCount = (t: string) => setCards.filter(c => (c.type || '').toLowerCase() === t.toLowerCase()).length;
+const characterCount = typeCount('Character');
+const actionCount    = typeCount('Action');
+const itemCount      = typeCount('Item');
+const locationCount  = typeCount('Location');
+
+// Sibling sets nav (prev/next main set)
+const mainSets = (sets as SetMeta[])
+  .filter(s => s.kind === 'main')
+  .sort((a, b) => a.id.localeCompare(b.id));
+const ix = mainSets.findIndex(s => s.id === setMeta.id);
+const prevSet = ix > 0 ? mainSets[ix - 1] : null;
+const nextSet = ix !== -1 && ix < mainSets.length - 1 ? mainSets[ix + 1] : null;
+
+const setLogoExists = hasSetLogo(setMeta.id);
+const canonical = `https://www.swutcg.one/set/${setMeta.slug}`;
+const description = `${setMeta.name} (Set ${setMeta.id}) Star Wars Unlimited card list. Browse all ${totalCards} cards: ${characterCount} characters, ${actionCount} actions, ${itemCount} items, ${locationCount} locations. Complete Star Wars Unlimited set list.`;
+
+const breadcrumbJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home',     item: 'https://www.swutcg.one/' },
+    { '@type': 'ListItem', position: 2, name: 'Database', item: 'https://www.swutcg.one/database' },
+    { '@type': 'ListItem', position: 3, name: setMeta.name, item: canonical },
+  ],
+};
+
+const collectionJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  name: `${setMeta.name} (Set ${setMeta.id}) - Star Wars Unlimited Card List`,
+  description,
+  url: canonical,
+  numberOfItems: totalCards,
+  isPartOf: {
+    '@type': 'WebSite',
+    name: 'SWUTCG.one',
+    url: 'https://www.swutcg.one/',
+  },
+};
+---
+
+<Layout
+  title={`${setMeta.name} Card List - Set ${setMeta.id} | Star Wars Unlimited Set`}
+  description={description}
+  canonical={canonical}
+  pageId="set-detail"
+  noindex={true}
+>
+  <script is:inline type="application/ld+json" set:html={JSON.stringify(breadcrumbJsonLd)} />
+  <script is:inline type="application/ld+json" set:html={JSON.stringify(collectionJsonLd)} />
+
+  <Navigation />
+
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <ol>
+      <li><a href="/">Home</a></li>
+      <li><a href="/database">Database</a></li>
+      <li aria-current="page">{setMeta.name}</li>
+    </ol>
+  </nav>
+
+  <header class="set-header">
+    {setLogoExists ? (
+      <img
+        src={`/set-logos/${setMeta.id}.webp`}
+        alt={`${setMeta.name} Star Wars Unlimited set logo`}
+        class="set-header-logo"
+        width="600"
+        height="250"
+        loading="eager"
+        fetchpriority="high"
+        decoding="async"
+      />
+    ) : (
+      <h1 class="set-header-title">{setMeta.name}</h1>
+    )}
+    <p class="set-header-meta">
+      Set {setMeta.id}{setMeta.release ? ` · Released ${setMeta.release}` : ''} · {totalCards} cards
+    </p>
+    <p class="set-header-intro">
+      Complete card list for <strong>{setMeta.name}</strong> (Set {setMeta.id}) in Star Wars Unlimited.
+      Browse all {totalCards} cards in this set: {characterCount} characters, {actionCount} actions, {itemCount} items, and {locationCount} locations.
+    </p>
+  </header>
+
+  <main>
+    <div class="cards-grid" role="list" aria-label={`${setMeta.name} card list`}>
+      {setCards.map((card, idx) => {
+        const img = getImageUrl(card);
+        const srcset = getImageSrcSet(card);
+        const cardPrice = card.price && Number(card.price) > 0 ? `$${Number(card.price).toFixed(2)}` : null;
+        const tcgUrl = getTcgAffiliateUrl(card.tcgPlayerId);
+        const altText = `${card.displayName || card.name} (${card.id})`;
+        return (
+          <div class="card" role="listitem" data-card-id={card.id}>
+            <a class="card-link" href={`/card/${card.slug || card.id}`} aria-label={altText}>
+              <div class="card-image">
+                {srcset ? (
+                  <img
+                    src={srcset.src}
+                    srcset={srcset.srcset}
+                    sizes={srcset.sizes}
+                    alt={escapeHtml(altText)}
+                    width="350"
+                    height="490"
+                    loading={idx < 12 ? 'eager' : 'lazy'}
+                    fetchpriority={idx < 12 ? 'high' : undefined}
+                    decoding="async"
+                  />
+                ) : img ? (
+                  <img src={img} alt={escapeHtml(altText)} width="350" height="490" loading="lazy" decoding="async" />
+                ) : (
+                  <div class="no-image">No Image</div>
+                )}
+              </div>
+            </a>
+            {cardPrice && tcgUrl && (
+              <a href={tcgUrl} target="_blank" rel="noopener sponsored" class="card-price-badge">
+                <span class="price-text">{cardPrice}</span>
+                <img src="/tcgplayer-logo.webp" alt="Buy on TCGPlayer" class="cart-icon" width="16" height="12" />
+              </a>
+            )}
+          </div>
+        );
+      })}
+    </div>
+
+    <nav class="set-siblings" aria-label="Adjacent sets">
+      {prevSet ? (
+        <a class="set-sibling-link" href={`/set/${prevSet.slug}`}>
+          <span class="set-sibling-dir">Previous set</span>
+          <span class="set-sibling-name">{prevSet.name}</span>
+        </a>
+      ) : <span />}
+      <a class="home-cta" href="/database">Browse all cards</a>
+      {nextSet ? (
+        <a class="set-sibling-link set-sibling-next" href={`/set/${nextSet.slug}`}>
+          <span class="set-sibling-dir">Next set</span>
+          <span class="set-sibling-name">{nextSet.name}</span>
+        </a>
+      ) : <span />}
+    </nav>
+  </main>
+</Layout>
+
+<style is:inline>
+  .set-header {
+    text-align: center;
+    margin: 0 auto var(--space-2xl);
+    max-width: 880px;
+  }
+  .set-header-logo {
+    display: block;
+    margin: 0 auto var(--space-md);
+    max-width: min(560px, 90%);
+    height: auto;
+  }
+  .set-header-title {
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    margin: 0 0 var(--space-md);
+  }
+  .set-header-meta {
+    color: var(--color-text-tertiary);
+    font-size: var(--font-size-sm);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin: 0 0 var(--space-md);
+  }
+  .set-header-intro {
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+    margin: 0 auto;
+    max-width: 70ch;
+  }
+
+  .set-siblings {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: var(--space-lg);
+    align-items: center;
+    margin: var(--space-2xl) 0;
+  }
+  .set-sibling-link {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    color: var(--color-text-primary);
+    text-decoration: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-md);
+    transition: border-color var(--transition-fast), background-color var(--transition-fast);
+  }
+  .set-sibling-link:hover {
+    border-color: var(--color-swu-gold);
+    background: rgba(211, 186, 132, 0.06);
+  }
+  .set-sibling-next {
+    text-align: right;
+    justify-self: end;
+  }
+  .set-sibling-dir {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .set-sibling-name {
+    font-weight: var(--font-weight-bold);
+  }
+
+  @media (max-width: 600px) {
+    .set-siblings {
+      grid-template-columns: 1fr;
+    }
+    .set-sibling-next {
+      text-align: left;
+      justify-self: stretch;
+    }
+  }
+
+  /* Reuse breadcrumb styling from FAQ pages */
+  .breadcrumbs {
+    margin: 0 auto var(--space-lg);
+    max-width: 1280px;
+  }
+  .breadcrumbs ol {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    padding: 0;
+    margin: 0;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-tertiary);
+  }
+  .breadcrumbs li { display: flex; align-items: center; gap: var(--space-xs); }
+  .breadcrumbs li + li::before { content: '›'; color: var(--color-text-tertiary); margin-right: var(--space-xs); }
+  .breadcrumbs a { color: var(--color-accent-primary); text-decoration: none; }
+  .breadcrumbs a:hover { color: var(--color-swu-gold); }
+  .breadcrumbs li[aria-current="page"] { color: var(--color-text-secondary); }
+</style>

@@ -1,0 +1,77 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Navigation from '../../components/Navigation.astro';
+import { faqs } from '../../data/faqs.js';
+import '../../styles/pages/faq.css';
+
+export async function getStaticPaths() {
+  const { faqs: allFaqs } = await import('../../data/faqs.js');
+  // Only generate pages for entries that have long-form content.
+  return allFaqs
+    .filter((f: any) => !!f.long)
+    .map((f: any) => ({ params: { slug: f.slug } }));
+}
+
+const { slug } = Astro.params;
+const faq = faqs.find((f: any) => f.slug === slug);
+if (!faq || !faq.long) {
+  return Astro.redirect('/404');
+}
+
+const canonical = `https://www.swutcg.one/faq/${faq.slug}`;
+const description = faq.short;
+---
+
+<Layout
+  title={`${faq.q} | Star Wars Unlimited FAQ`}
+  description={description}
+  canonical={canonical}
+  pageId="faq"
+>
+  <script is:inline type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [{
+      "@type": "Question",
+      "name": faq.q,
+      "acceptedAnswer": { "@type": "Answer", "text": faq.short }
+    }]
+  })} />
+
+  <script is:inline type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.swutcg.one/" },
+      { "@type": "ListItem", "position": 2, "name": "FAQ", "item": "https://www.swutcg.one/#faq" },
+      { "@type": "ListItem", "position": 3, "name": faq.q, "item": canonical }
+    ]
+  })} />
+
+  <header>
+    <Navigation activePage="faq" />
+  </header>
+
+  <main>
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+      <ol>
+        <li><a href="/">Home</a></li>
+        <li><a href="/#faq">FAQ</a></li>
+        <li aria-current="page">{faq.q}</li>
+      </ol>
+    </nav>
+
+    <article class="faq-article">
+      <header class="faq-article-header">
+        <h1>{faq.q}</h1>
+        <p class="faq-article-summary">{faq.short}</p>
+      </header>
+
+      <div class="faq-article-body" set:html={faq.long}></div>
+
+      <footer class="faq-article-footer">
+        <a href="/#faq" class="cta-secondary">← Back to all FAQs</a>
+      </footer>
+    </article>
+  </main>
+</Layout>

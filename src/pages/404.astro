@@ -1,0 +1,75 @@
+﻿---
+import Layout from '../layouts/Layout.astro';
+import Navigation from '../components/Navigation.astro';
+---
+
+<Layout
+  title="404 - Page Not Found | SWUTCG.one"
+  description="That page seems to have slipped into the inkwell. Browse the Star Wars Unlimited card database, decklists, or deck builder instead."
+  canonical="https://www.swutcg.one/404"
+  pageId="error-404"
+  noindex={true}
+>
+  <Navigation />
+
+  <main class="error-404">
+    <h1>404</h1>
+    <p class="error-404-sub">Lost in the Inkwell</p>
+    <p class="error-404-text">
+      That page seems to have slipped into the inkwell. The card you were looking for may have been renumbered, or the URL might have a typo.
+    </p>
+    <div class="error-404-links">
+      <a href="/" class="home-cta">Back to home</a>
+      <a href="/database">Browse cards</a>
+      <a href="/decklists">Tournament decklists</a>
+      <a href="/builder">Deck builder</a>
+    </div>
+  </main>
+</Layout>
+
+<style is:inline>
+  .error-404 {
+    text-align: center;
+    padding: var(--space-2xl) var(--space-md);
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  .error-404 h1 {
+    font-size: clamp(4rem, 12vw, 7rem);
+    line-height: 1;
+    margin: 0 0 var(--space-sm);
+    color: var(--color-swu-gold);
+    letter-spacing: -0.04em;
+    font-weight: 900;
+  }
+  .error-404-sub {
+    font-size: var(--font-size-xl);
+    margin: 0 0 var(--space-lg);
+    color: var(--color-text-secondary);
+    font-weight: 700;
+  }
+  .error-404-text {
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+    margin: 0 0 var(--space-2xl);
+    font-size: var(--font-size-lg);
+  }
+  .error-404-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+    justify-content: center;
+  }
+  .error-404-links a:not(.home-cta) {
+    color: var(--color-accent-primary);
+    text-decoration: none;
+    font-weight: var(--font-weight-bold);
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid transparent;
+    transition: border-color var(--transition-fast), color var(--transition-fast);
+  }
+  .error-404-links a:not(.home-cta):hover {
+    border-bottom-color: var(--color-swu-gold);
+    color: var(--color-swu-gold);
+  }
+</style>

@@ -1,0 +1,28 @@
+﻿{
+  "name": "swutcg-zone",
+  "type": "module",
+  "version": "0.0.1",
+  "description": "Star Wars Unlimited card database",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "node scripts/decompress-data.js && astro check && astro build && node scripts/indexnow.js",
+    "preview": "astro preview",
+    "astro": "astro",
+    "fetch-data": "node scripts/fetch-data.js",
+    "fetch-decklists": "node scripts/fetch-decklists.js",
+    "download-images": "node scripts/download-images.js"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.8",
+    "@astrojs/tailwind": "^6.0.2",
+    "astro": "^6.1.9",
+    "jsdom": "24.1.3",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.9.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.5",
+    "sharp": "^0.34.5"
+  }
+}

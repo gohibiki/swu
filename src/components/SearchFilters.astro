@@ -1,0 +1,101 @@
+---
+import { COLORS, CARD_TYPES, ABILITIES } from '../utils/cardConstants.js';
+
+const TYPE_LETTERS: Record<string, string> = {
+  Unit: 'U',
+  Pilot: 'P',
+  Command: 'C',
+  Base: 'B',
+  Resource: 'R'
+};
+---
+
+<section class="controls" aria-label="Card Search and Filters">
+  <div class="top-controls-row">
+    <input
+      type="text"
+      id="searchBar"
+      class="search-bar"
+      placeholder="Search by name, ID (GD04-001), trait, or effect text..."
+      aria-label="Search cards"
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="off"
+      spellcheck="false"
+    />
+    <div class="color-filter top-color-filter" role="group" aria-label="Filter by color">
+      {COLORS.map(color => (
+        <div
+          class={`filter-chip color-chip ${color.key.toLowerCase()}`}
+          data-ink={color.key.toLowerCase()}
+          role="button"
+          tabindex="0"
+          aria-label={`Filter by ${color.label}`}
+          aria-pressed="false"
+          title={color.label}
+        ></div>
+      ))}
+    </div>
+    <button id="filterToggleBtn" class="icon-toggle" title="Toggle Filters" aria-label="Show or hide filter options">
+      <span style="width: 18px;"></span>
+      <span style="width: 12px;"></span>
+      <span style="width: 6px;"></span>
+    </button>
+    <button id="toggleAABtn" class="icon-toggle" title="Toggle Alternate Art Cards" aria-label="Show or hide alternate art cards" aria-pressed="false">
+      <span>AA</span>
+    </button>
+  </div>
+
+  <div class="filters-row" id="filtersRow">
+    <div class="type-filter" role="group" aria-label="Filter by card type">
+      {CARD_TYPES.map(type => (
+        <div
+          class="filter-chip type-chip"
+          data-type={type}
+          role="button"
+          tabindex="0"
+          aria-label={`Filter by ${type}`}
+          aria-pressed="false"
+          title={type}
+        >
+          {TYPE_LETTERS[type] || type[0]}
+        </div>
+      ))}
+    </div>
+
+    <div class="cost-filter" role="group" aria-label="Filter by card cost">
+      {[0,1,2,3,4,5,6,7,8,9].map(cost => (
+        <div
+          class="filter-chip cost-chip"
+          data-cost={cost}
+          role="button"
+          tabindex="0"
+          aria-label={`Filter by cost ${cost}`}
+          aria-pressed="false"
+        >{cost}</div>
+      ))}
+      <div
+        class="filter-chip cost-chip cost-chip-high"
+        data-cost="10"
+        role="button"
+        tabindex="0"
+        aria-label="Filter by cost 10 or more"
+        aria-pressed="false"
+      >10+</div>
+    </div>
+
+    <div class="ability-filter" role="group" aria-label="Filter by keyword ability">
+      {ABILITIES.map(a => (
+        <div
+          class="filter-chip ability-chip"
+          data-ability={a.key}
+          role="button"
+          tabindex="0"
+          aria-label={`Filter by ${a.label}`}
+          aria-pressed="false"
+          title={a.label}
+        >{a.label}</div>
+      ))}
+    </div>
+  </div>
+</section>

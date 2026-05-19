@@ -1,0 +1,239 @@
+﻿/* Eurostile â€” the typeface Fantasy Flight Games uses on the official Star Wars Unlimited
+   cards. Two cuts: 'Round Extended Medium' for upper text (card names,
+   headings, UI labels) and 'Round Heavy' for body / description copy.
+   Self-hosted woff2; ~40 KB per weight. */
+
+/* HEADING face: Eurostile Round Extended Medium â€” wider, more architectural */
+@font-face {
+  font-family: 'Eurostile Heading';
+  src: url('/fonts/eurostile/EurostileRoundExtended-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: optional;
+}
+
+/* BODY face: Eurostile Round (Regular + Heavy + Heavy Italic) */
+@font-face {
+  font-family: 'Eurostile';
+  src: url('/fonts/eurostile/EurostileRound-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: optional;
+}
+@font-face {
+  font-family: 'Eurostile';
+  src: url('/fonts/eurostile/EurostileRound-Heavy.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: optional;
+}
+@font-face {
+  font-family: 'Eurostile';
+  src: url('/fonts/eurostile/EurostileRound-HeavyItalic.woff2') format('woff2');
+  font-weight: 700;
+  font-style: italic;
+  font-display: optional;
+}
+
+/* Site-wide: Eurostile Round (body) for everything; Round Extended Medium
+   takes over on headings to match Fantasy Flight Games's actual card layout typography.
+   Roboto stays as a Latin-extended fallback. */
+body, input, textarea, select, button {
+  font-family: 'Eurostile', 'Roboto', system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 1rem;            /* 16px baseline (was 20px) */
+  line-height: 1.55;
+}
+
+/* Unified heading scale â€” clamp() so they shrink on mobile without media
+   queries. line-height tight on big sizes, looser on small. */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Eurostile Heading', 'Eurostile', 'Roboto', system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+h1 { font-size: clamp(1.75rem, 3vw, 2.25rem); line-height: 1.1; margin: 0 0 var(--space-lg); }
+h2 { font-size: clamp(1.375rem, 2.4vw, 1.75rem); line-height: 1.25; margin: 0 0 var(--space-sm); }
+h3 { font-size: 1.125rem; line-height: 1.3;  margin: 0 0 var(--space-xs); }
+h4 { font-size: 1rem;     line-height: 1.3;  margin: 0 0 var(--space-xs); }
+h5 { font-size: 0.875rem; line-height: 1.3; }
+h6 { font-size: 0.75rem;  line-height: 1.3; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-tertiary); }
+
+/* Lead paragraph under page titles â€” slightly larger than base body,
+   looser leading. Inherits text-align from its parent so it stays in
+   sync with the H1 above it (left on inner pages, center on the hero). */
+.page-intro, .hero-tagline {
+  font-size: 1.0625rem;       /* 17px */
+  line-height: 1.65;
+  color: var(--color-text-secondary);
+  max-width: 720px;
+}
+/* Hero is centered, so the tagline needs auto margins to stay under
+   the title; inner pages keep the left-aligned default. */
+.hero-tagline {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Page header block â€” used by every inner page (database, builder,
+   decklists, how-to-play, set, card detail). One source of truth for the
+   space between title and intro and the gap below the whole header. */
+.page-header,
+.builder-header,
+.decklists-page > header,
+.how-to-play > header,
+main > header:not(.hero),
+.container > header {
+  margin-bottom: var(--space-sm);
+}
+.page-header h1,
+.container > header h1,
+main > header:not(.hero) h1 {
+  margin: 0 0 var(--space-sm);
+}
+.page-header .page-intro,
+.container > header .page-intro,
+main > header:not(.hero) .page-intro {
+  margin: 0;
+}
+
+/* CSS Custom Properties (Design Tokens) â€” dark mode only.
+   Light-mode tokens were removed; the site is dark-only by design. */
+:root {
+  color-scheme: dark;
+
+  /* Star Wars Unlimited Federation palette â€” derived from RX-78-2 tricolor + Federation
+     mobile-suit color naming. Yellow primary (V-fin antenna / chest) on
+     deep-space dark, with Federation blue as secondary accent. */
+  --color-swu-yellow:    #F1C44A;  /* Federation MS Yellow â€” primary accent */
+  --color-swu-yellow-hi: #FFD66B;  /* hover state */
+  --color-swu-blue:      #355C9A;  /* Federation MS Blue â€” secondary */
+  --color-swu-red:       #C61F2B;  /* Char's Custom Red â€” destructive */
+  --color-swu-white:     #F2F2F0;  /* SWU White â€” soft text */
+  --color-swu-space:     #0F0F12;  /* deep-space background */
+
+  /* Card faction tints â€” match dotgg's `color` field for chip backgrounds */
+  --color-card-blue:  #2F6DB8;
+  --color-card-green: #3FA55B;
+  --color-card-red:   #D83A34;
+  --color-card-white: #E8E8E8;
+
+  /* Backgrounds â€” neutral cool grays (not kelp/sand) */
+  --color-bg-primary:   #131316;
+  --color-bg-secondary: #1C1C20;
+  --color-bg-tertiary:  #26262C;
+  --color-bg-elevated:  #1C1C20;
+
+  --color-text-primary:   #ECECEC;
+  --color-text-secondary: #B8B8BC;
+  --color-text-tertiary:  #80808A;
+  --color-text-inverted:  #0F0F12;
+
+  /* Accents map to Federation Yellow */
+  --color-accent-primary: #F1C44A;
+  --color-accent-hover:   #FFD66B;
+  --color-accent-light:   #E0B43A;
+
+  /* Backwards-compat aliases â€” older CSS in components.css references
+     `--color-swu-gold`. Map to the new yellow so nothing breaks. */
+  --color-swu-gold:       #F1C44A;
+  --color-swu-indigo:     #355C9A;
+  --color-swu-parchment:  #FFD66B;
+  --color-swu-kelp:       #131316;
+
+  --color-warning: #ff9800;
+  --color-warning-dark: #ffb74d;
+  --color-warning-bg: #4d3f28;
+  --color-warning-bg-alt: #4d3f28;
+  --color-error: #ff8a80;
+  --color-error-bg: #4d1a1f;
+  --color-success: #66bb6a;
+  --color-success-dark: #81c784;
+  --color-success-bg: #1e3c20;
+
+  --color-border: #2C2C32;
+  --color-border-light: #3A3A40;
+  --color-border-dark: #44444C;
+
+  /* Indigo-tinted versions of the legacy "blue" tokens (used for nav
+     hover/active, card-detail effect block, etc). */
+  --color-blue-light: #2D2D40;
+  --color-blue-dark: #A8AED5;
+  --color-blue-primary: #A8AED5;
+  --color-orange: #ffb74d;
+  --color-gray-50: #26272b;
+  --color-gray-100: #333;
+  --color-gray-200: #555;
+  --color-gray-400: #888;
+  --color-gray-500: #aaa;
+  --color-gray-600: #495057;
+  --color-gray-700: #5a6268;
+  --color-gray-800: #444;
+  --color-gray-900: #4a4a4a;
+
+  --color-overlay: rgba(0, 0, 0, 0.7);
+
+  /* Spacing */
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 15px;
+  --space-lg: 20px;
+  --space-xl: 30px;
+  --space-2xl: 40px;
+
+  /* Typography â€” modular scale, in rem so it scales with root.
+     Body baseline is 16px (1rem); see h1-h6 rules for heading sizes. */
+  --font-family-primary: 'Eurostile', 'Roboto', 'Roboto Fallback', sans-serif;
+  --font-size-xs:    0.75rem;     /* 12px â€” chips, badges, captions */
+  --font-size-sm:    0.875rem;    /* 14px â€” small text, tertiary labels */
+  --font-size-base:  1rem;        /* 16px â€” body default */
+  --font-size-md:    1.125rem;    /* 18px â€” emphasised body, section labels */
+  --font-size-lg:    1.25rem;     /* 20px â€” small headings */
+  --font-size-xl:    1.5rem;      /* 24px â€” H2 inline references */
+  --font-size-2xl:   1.875rem;    /* 30px â€” large display */
+  --font-weight-normal: 400;
+  --font-weight-bold: 700;
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.7);
+
+  /* Transitions */
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s ease;
+
+  /* Layout */
+  --container-padding: 20px;
+  --header-height: 90px;
+}
+
+/* Scrollbar customization */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-dark) var(--color-bg-secondary);
+}
+
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-dark);
+  border-radius: 6px;
+  border: 3px solid var(--color-bg-secondary);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-border);
+}

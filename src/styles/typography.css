@@ -1,0 +1,33 @@
+/* Roboto — Latin-extended fallback when Eurostile lacks a glyph. */
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/Roboto-Regular.woff2') format('woff2');
+  /* `optional`: with Roboto only stepping in for missing glyphs, the
+     swap-induced CLS would be wasted; let it stay in fallback for the
+     session if it's not ready instantly. */
+  font-display: optional;
+}
+
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-weight: 700;
+  src: url('/fonts/Roboto-Bold.woff2') format('woff2');
+  font-display: optional;
+}
+
+/* Metric-matched local fallback so the layout is identical whether the
+   browser uses Roboto or system Arial. Eliminates CLS even when
+   `optional` keeps the fallback for the session. */
+@font-face {
+  font-family: 'Roboto Fallback';
+  src: local('Arial');
+  size-adjust: 100.06%;
+  ascent-override: 92.77%;
+  descent-override: 24.41%;
+  line-gap-override: 0%;
+}
+
+/* All page-title and page-intro typography lives in tokens.css now. */

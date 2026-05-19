@@ -1,0 +1,495 @@
+---
+export const prerender = true;
+
+import Layout from '../../layouts/Layout.astro';
+import Navigation from '../../components/Navigation.astro';
+import { loadCardData } from '../../utils/loadCardData.js';
+import { getImageUrl, getImageSrcSet, getTcgAffiliateUrl } from '../../utils/helpers.js';
+import { boldKeywords } from '../../utils/cardConstants.js';
+import { getSetMeta } from '../../utils/setData.js';
+
+interface Card {
+  id: string;
+  slug?: string;
+  name?: string;
+  type?: string;
+  color?: string;
+  rarity?: string;
+  cost?: number | null;
+  level?: number | null;
+  ap?: number | null;
+  hp?: number | null;
+  zone?: string;
+  trait?: string;
+  link?: string;
+  source_title?: string;
+  description?: string;
+  action?: string;
+  set?: string;
+  price?: number | null;
+  delta7dPrice?: number | null;
+  tcgPlayerId?: string | null;
+}
+
+interface Props {
+  card: Card;
+  variants: Card[];
+}
+
+export async function getStaticPaths() {
+  const { cards } = await loadCardData() as { cards: Card[] };
+
+  // Group cards by base ID — variants share the base ID but add `_p1`,
+  // `_p2` suffixes (e.g. ST02-011 / ST02-011_p1 / ST02-011_p2).
+  // Same approach as optcg's card/[id].astro.
+  const groups = new Map<string, { base: Card | null; variants: Card[] }>();
+  for (const card of cards) {
+    if (!card.id) continue;
+    const baseId = card.id.split('_')[0];
+    if (!groups.has(baseId)) groups.set(baseId, { base: null, variants: [] });
+    const group = groups.get(baseId)!;
+    if (card.id.includes('_')) group.variants.push(card);
+    else group.base = card;
+  }
+
+  // One page per base card (or first variant if no base exists). Slug is
+  // the base card's slug; variant slugs are NOT routed — they're listed
+  // as alt-arts on the base card's page.
+  const seen = new Set<string>();
+  const paths: { params: { id: string }; props: Props }[] = [];
+  for (const group of groups.values()) {
+    const card = group.base || group.variants[0];
+    if (!card) continue;
+    const slug = card.slug || card.id;
+    if (seen.has(slug)) continue;
+    seen.add(slug);
+    paths.push({
+      params: { id: slug },
+      props: { card, variants: group.variants }
+    });
+  }
+  return paths;
+}
+
+const { card, variants } = Astro.props as Props;
+
+const imageUrl = getImageUrl(card);
+const imageSrcSet = getImageSrcSet(card);
+const cardURL = `https://www.swutcg.one/card/${card.slug || card.id}`;
+
+// Display ID hides the alt-print suffix (_p1, _p2, ...) so the user
+// sees the canonical Fantasy Flight Games card code. The internal card.id stays
+// unchanged for image lookups, slug routing, etc.
+const displayId = (card.id || '').split('_')[0];
+
+const pageTitle = `${card.name} (${displayId}) - Star Wars Unlimited`;
+const description = (card.action || `${card.name}: ${card.type} card from the Star Wars Unlimited.`).slice(0, 160);
+
+const tcgPlayerProductUrl = card.tcgPlayerId ? `https://www.tcgplayer.com/product/${card.tcgPlayerId}` : null;
+const tcgPlayerUrl = getTcgAffiliateUrl(card.tcgPlayerId);
+
+function fmtPrice(p: unknown): string | null {
+  if (p === null || p === undefined || p === '' || p === 0) return null;
+  return `$${Number(p).toFixed(2)}`;
+}
+const tcgPrice = fmtPrice(card.price);
+
+const setMeta = card.set ? getSetMeta(card.set) : null;
+
+// Same-set cross-link tiles: pick up to 8 other cards from the same set,
+// excluding alt-prints (no `_p` suffix) and the current card itself.
+const { cards: allCards } = await loadCardData() as { cards: Card[] };
+const sameSetCards = card.set
+  ? allCards
+      .filter(c => c.set === card.set && c.id !== card.id && !c.id.includes('_'))
+      .slice(0, 8)
+  : [];
+
+const safeAction = card.action ? boldKeywords(card.action) : null;
+
+function present(v: unknown): boolean {
+  if (v === null || v === undefined) return false;
+  if (typeof v === 'string') return v.trim() !== '' && v.trim() !== '-';
+  if (typeof v === 'number') return true;
+  return Boolean(v);
+}
+
+// Index cards that have meaningful content (effect text OR a TCGplayer
+// listing). Promo / token / placeholder cards with no description and
+// no price are noindex'd to keep low-quality pages out of the index.
+const isLowContent = !card.action && !card.price && !card.tcgPlayerId;
+---
+
+<Layout
+  title={pageTitle}
+  description={description}
+  canonical={cardURL}
+  pageId="card-detail"
+  noindex={isLowContent}
+>
+  <script is:inline type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": `${card.name} (${card.id})`,
+    "description": card.action || `${card.name} - Star Wars Unlimited ${card.type || ''} card.`,
+    "sku": card.id,
+    "url": cardURL,
+    "image": imageUrl,
+    "category": `Star Wars Unlimited ${card.color || ''} ${card.type || ''}`.trim(),
+    "brand": { "@type": "Brand", "name": "Star Wars Unlimited" },
+    ...(tcgPrice && tcgPlayerProductUrl ? {
+      "offers": {
+        "@type": "Offer",
+        "price": card.price,
+        "priceCurrency": "USD",
+        "url": tcgPlayerProductUrl,
+        "availability": "https://schema.org/InStock"
+      }
+    } : {})
+  })} />
+
+  <script is:inline type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.swutcg.one/" },
+      { "@type": "ListItem", "position": 2, "name": "Database", "item": "https://www.swutcg.one/database" },
+      ...(setMeta ? [{ "@type": "ListItem", "position": 3, "name": setMeta.name, "item": `https://www.swutcg.one/set/${setMeta.slug}` }] : []),
+      { "@type": "ListItem", "position": setMeta ? 4 : 3, "name": card.name, "item": cardURL }
+    ]
+  })} />
+
+  <Navigation />
+
+  <main class="card-detail-page">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+      <ol>
+        <li><a href="/">Home</a></li>
+        <li><a href="/database">Database</a></li>
+        {setMeta && <li><a href={`/set/${setMeta.slug}`}>{setMeta.name}</a></li>}
+        <li aria-current="page">{card.name}</li>
+      </ol>
+    </nav>
+
+    <div class="modal-content-static">
+      <div class="modal-image" data-card-image-cycler>
+        {variants.length > 0 && (
+          <button class="aa-prev-btn aa-badge-left" aria-label="Previous alt-art" type="button">&#9664;</button>
+        )}
+        {imageSrcSet ? (
+          <img
+            id="cardMainImage"
+            src={imageSrcSet.src}
+            srcset={imageSrcSet.srcset}
+            sizes="(max-width: 767px) 280px, 350px"
+            width="350"
+            height="490"
+            alt={`${card.name} (${displayId})`}
+            loading="eager"
+            fetchpriority="high"
+            decoding="sync"
+            data-image-index="0"
+            data-image-list={JSON.stringify([
+              { id: card.id, src: imageSrcSet.src, srcset: imageSrcSet.srcset },
+              ...variants.map(v => {
+                const vs = getImageSrcSet(v);
+                return vs ? { id: v.id, src: vs.src, srcset: vs.srcset } : null;
+              }).filter(Boolean)
+            ])}
+          />
+        ) : imageUrl ? (
+          <img src={imageUrl} width="350" height="490" alt={`${card.name} (${displayId})`} loading="eager" decoding="sync" />
+        ) : (
+          <div class="no-image">No Image Available</div>
+        )}
+        {variants.length > 0 && (
+          <>
+            <button class="aa-next-btn aa-badge-right" aria-label="Next alt-art" type="button">&#9654;</button>
+            <span class="aa-counter" id="aaCounter">1 / {variants.length + 1}</span>
+          </>
+        )}
+      </div>
+
+      <div class="modal-details">
+        <h1>{card.name}</h1>
+
+        <div class="modal-stats">
+          <div class="stat-row">
+            <span class="modal-stat-label">ID</span>
+            <span class="modal-stat-value">{displayId}</span>
+          </div>
+          {setMeta && (
+            <div class="stat-row">
+              <span class="modal-stat-label">Set</span>
+              <span class="modal-stat-value"><a href={`/set/${setMeta.slug}`}>{setMeta.name}</a></span>
+            </div>
+          )}
+          {present(card.type) && (
+            <div class="stat-row">
+              <span class="modal-stat-label">Type</span>
+              <span class="modal-stat-value">{card.type}</span>
+            </div>
+          )}
+          {present(card.color) && (
+            <div class="stat-row">
+              <span class="modal-stat-label">Color</span>
+              <span class="modal-stat-value">{card.color}</span>
+            </div>
+          )}
+          {present(card.rarity) && (
+            <div class="stat-row">
+              <span class="modal-stat-label">Rarity</span>
+              <span class="modal-stat-value">{card.rarity}</span>
+            </div>
+          )}
+          {present(card.cost) && (
+            <div class="stat-row">
+              <span class="modal-stat-label">Cost</span>
+              <span class="modal-stat-value">{card.cost}</span>
+            </div>
+          )}
+          {present(card.level) && (
+            <div class="stat-row">
+              <span class="modal-stat-label">Lv</span>
+              <span class="modal-stat-value">{card.level}</span>
+            </div>
+          )}
+          {present(card.ap) && (
+            <div class="stat-row">
+              <span class="modal-stat-label">AP</span>
+              <span class="modal-stat-value">{card.ap}</span>
+            </div>
+          )}
+          {present(card.hp) && (
+            <div class="stat-row">
+              <span class="modal-stat-label">HP</span>
+              <span class="modal-stat-value">{card.hp}</span>
+            </div>
+          )}
+          {present(card.zone) && (
+            <div class="stat-row">
+              <span class="modal-stat-label">Zone</span>
+              <span class="modal-stat-value">{card.zone}</span>
+            </div>
+          )}
+          {present(card.trait) && (
+            <div class="stat-row col-span-full">
+              <span class="modal-stat-label">Trait</span>
+              <span class="modal-stat-value">{card.trait}</span>
+            </div>
+          )}
+          {present(card.link) && (
+            <div class="stat-row col-span-full">
+              <span class="modal-stat-label">Link</span>
+              <span class="modal-stat-value">{card.link}</span>
+            </div>
+          )}
+          {present(card.source_title) && (
+            <div class="stat-row col-span-full">
+              <span class="modal-stat-label">Source</span>
+              <span class="modal-stat-value">{card.source_title}</span>
+            </div>
+          )}
+        </div>
+
+        {safeAction && (
+          <div class="modal-effect">
+            <h2>Effect</h2>
+            <p set:html={safeAction}></p>
+          </div>
+        )}
+      </div>
+    </div>
+
+    {variants.length > 0 && (
+      <section class="info-section variant-section">
+        <h2>Alternate Arts ({variants.length + 1})</h2>
+        <p class="variant-intro">All printings of this card. Each art is a separate TCGPlayer product.</p>
+        <div class="variant-grid">
+          <div class="variant-card variant-base">
+            {imageSrcSet && (
+              <img
+                src={imageSrcSet.src}
+                srcset={imageSrcSet.srcset}
+                sizes="(max-width: 767px) 140px, 200px"
+                width="350"
+                height="490"
+                alt={`${card.name} (${displayId})`}
+                loading="lazy"
+                decoding="async"
+              />
+            )}
+            <div class="variant-meta">
+              <span class="variant-id">{card.id}</span>
+              {tcgPrice && tcgPlayerUrl && (
+                <a href={tcgPlayerUrl} target="_blank" rel="noopener sponsored" class="variant-price">{tcgPrice}</a>
+              )}
+            </div>
+          </div>
+          {variants.map(v => {
+            const vSrcSet = getImageSrcSet(v);
+            const vTcgUrl = getTcgAffiliateUrl(v.tcgPlayerId);
+            const vPrice = fmtPrice(v.price);
+            return (
+              <div class="variant-card">
+                {vSrcSet && (
+                  <img
+                    src={vSrcSet.src}
+                    srcset={vSrcSet.srcset}
+                    sizes="(max-width: 767px) 140px, 200px"
+                    width="350"
+                    height="490"
+                    alt={`${v.name} variant (${v.id})`}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                )}
+                <div class="variant-meta">
+                  <span class="variant-id">{v.id}</span>
+                  {vPrice && vTcgUrl && (
+                    <a href={vTcgUrl} target="_blank" rel="noopener sponsored" class="variant-price">{vPrice}</a>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    )}
+
+    {tcgPlayerUrl && (
+      <div class="info-section price-widget">
+        <h2>Where to buy</h2>
+        <div class="price-content">
+          <div class="price-main">
+            <span class="price-label">TCGPlayer</span>
+            {tcgPrice && <span class="price-value">{tcgPrice}</span>}
+            <a href={tcgPlayerUrl} target="_blank" rel="noopener sponsored" class="buy-button">Buy on TCGPlayer</a>
+          </div>
+        </div>
+        <p class="affiliate-note">Affiliate link. We may earn a commission on purchases at no extra cost to you.</p>
+      </div>
+    )}
+
+    {sameSetCards.length > 0 && setMeta && (
+      <section class="info-section same-set-section">
+        <h2>More from {setMeta.name}</h2>
+        <div class="same-set-grid">
+          {sameSetCards.map(c => {
+            const ss = getImageSrcSet(c);
+            return (
+              <a href={`/card/${c.slug || c.id}`} class="same-set-tile" aria-label={`${c.name} (${c.id})`}>
+                {ss && (
+                  <img src={ss.src} srcset={ss.srcset} sizes="120px" width="160" height="224" alt={`${c.name} (${c.id})`} loading="lazy" decoding="async" />
+                )}
+              </a>
+            );
+          })}
+        </div>
+        <p class="same-set-link"><a href={`/set/${setMeta.slug}`}>View the full {setMeta.name} card list →</a></p>
+      </section>
+    )}
+  </main>
+
+  <style is:global>
+    .card-detail-page { max-width: 100%; margin: 0 auto; padding: var(--space-md) 0 var(--space-2xl); }
+    .breadcrumbs { margin: 0 auto var(--space-lg); }
+    .breadcrumbs ol { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-xs); padding: 0; margin: 0; font-size: var(--font-size-sm); color: var(--color-text-tertiary); }
+    .breadcrumbs li { display: flex; align-items: center; gap: var(--space-xs); }
+    .breadcrumbs li + li::before { content: '›'; color: var(--color-text-tertiary); margin-right: var(--space-xs); }
+    .breadcrumbs a { color: var(--color-accent-primary); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color var(--transition-fast), color var(--transition-fast); }
+    .breadcrumbs a:hover { border-bottom-color: var(--color-swu-gold); color: var(--color-swu-gold); }
+    .breadcrumbs li[aria-current="page"] { color: var(--color-text-secondary); }
+    .modal-content-static { background: transparent; padding: var(--space-xl); border: 1px solid var(--color-border); border-radius: var(--radius-lg); display: flex; gap: var(--space-xl); align-items: flex-start; margin-bottom: var(--space-lg); }
+    .modal-content-static h1 { margin: 0 0 var(--space-lg) 0; color: var(--color-text-primary); text-align: left; }
+    .modal-content-static .modal-image { flex-shrink: 0; width: 350px; position: relative; }
+    .modal-content-static .modal-image img { width: 100%; height: auto; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); display: block; }
+
+    /* AA prev/next buttons — overlay arrows on the card image to cycle alt-arts */
+    .aa-prev-btn, .aa-next-btn { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border: none; border-radius: 50%; background: rgba(15, 15, 18, 0.85); color: var(--color-swu-yellow); font-size: 1.1rem; cursor: pointer; z-index: 2; display: flex; align-items: center; justify-content: center; transition: background-color var(--transition-fast), transform var(--transition-fast); backdrop-filter: blur(4px); }
+    .aa-prev-btn:hover, .aa-next-btn:hover { background: rgba(241, 196, 74, 0.95); color: var(--color-text-inverted); }
+    .aa-badge-left { left: -12px; }
+    .aa-badge-right { right: -12px; }
+    .aa-counter { position: absolute; bottom: var(--space-sm); left: 50%; transform: translateX(-50%); padding: 4px 10px; background: rgba(15, 15, 18, 0.85); color: var(--color-swu-yellow); font-size: 0.8rem; border-radius: 10px; font-family: monospace; backdrop-filter: blur(4px); z-index: 2; }
+    @media (max-width: 768px) {
+      .aa-badge-left { left: 8px; }
+      .aa-badge-right { right: 8px; }
+    }
+    .modal-content-static .no-image { width: 350px; height: 490px; background: var(--color-bg-secondary); border: 2px dashed var(--color-border); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; color: var(--color-text-secondary); font-size: var(--font-size-base); }
+    .modal-stat-value a { color: var(--color-accent-primary); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color var(--transition-fast), color var(--transition-fast); }
+    .modal-stat-value a:hover { border-bottom-color: var(--color-swu-gold); color: var(--color-swu-gold); }
+    .info-section { background: transparent; padding: var(--space-lg); border: 1px solid var(--color-border); border-radius: var(--radius-lg); margin-bottom: var(--space-md); }
+    .info-section h2 { margin: 0 0 var(--space-md) 0; color: var(--color-text-primary); border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-sm); }
+
+    /* Alternate-arts grid */
+    .variant-section .variant-intro { margin: 0 0 var(--space-md); color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+    .variant-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--space-md); }
+    .variant-card { display: flex; flex-direction: column; gap: var(--space-xs); }
+    .variant-card img { width: 100%; height: auto; border-radius: var(--radius-md); display: block; transition: transform var(--transition-fast); }
+    .variant-card:hover img { transform: translateY(-2px); }
+    .variant-card.variant-base { position: relative; }
+    .variant-card.variant-base::before { content: 'Base'; position: absolute; top: var(--space-xs); left: var(--space-xs); background: var(--color-accent-primary); color: var(--color-text-inverted); font-size: 0.7rem; padding: 2px 6px; border-radius: 3px; font-weight: var(--font-weight-bold); z-index: 1; }
+    .variant-meta { display: flex; justify-content: space-between; align-items: center; font-size: var(--font-size-sm); }
+    .variant-id { color: var(--color-text-tertiary); font-family: monospace; font-size: 0.8rem; }
+    .variant-price { color: var(--color-swu-gold); font-weight: var(--font-weight-bold); text-decoration: none; font-variant-numeric: tabular-nums; }
+    .variant-price:hover { text-decoration: underline; }
+
+    .price-widget .price-content { display: flex; flex-wrap: wrap; gap: var(--space-lg); }
+    .price-main { display: flex; align-items: center; gap: var(--space-sm); font-size: var(--font-size-base); flex-wrap: wrap; }
+    .price-label { color: var(--color-text-secondary); font-weight: var(--font-weight-bold); }
+    .price-value { font-weight: var(--font-weight-bold); font-size: var(--font-size-xl); color: var(--color-swu-gold); font-variant-numeric: tabular-nums; }
+    .buy-button { display: inline-flex; align-items: center; padding: var(--space-sm) var(--space-lg); background: var(--color-accent-primary); color: var(--color-text-inverted); text-decoration: none; border-radius: var(--radius-md); font-weight: var(--font-weight-bold); font-size: var(--font-size-base); transition: background-color var(--transition-fast), transform var(--transition-fast); }
+    .buy-button:hover { background: var(--color-accent-hover); transform: translateY(-1px); }
+    .affiliate-note { margin: var(--space-md) 0 0; font-size: var(--font-size-sm); color: var(--color-text-tertiary); }
+    .same-set-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: var(--space-sm); }
+    .same-set-tile { display: block; border-radius: var(--radius-md); overflow: hidden; transition: transform var(--transition-fast); }
+    .same-set-tile:hover { transform: translateY(-3px); }
+    .same-set-tile img { width: 100%; height: auto; display: block; border-radius: var(--radius-md); }
+    .same-set-link { margin: var(--space-md) 0 0; font-size: var(--font-size-sm); }
+    .same-set-link a { color: var(--color-accent-primary); text-decoration: none; font-weight: 700; }
+    .same-set-link a:hover { text-decoration: underline; }
+    @media (max-width: 768px) {
+      .modal-content-static { flex-direction: column; padding: var(--space-lg); }
+      .modal-content-static .modal-image, .modal-content-static .no-image { width: 100%; max-width: 350px; margin: 0 auto; }
+      .modal-content-static .no-image { height: auto; aspect-ratio: 5/7; }
+    }
+  </style>
+
+  <script is:inline>
+    // AA cycler — prev/next buttons overlay the main card image and walk
+    // through [base, ...variants]. The image list is serialized into the
+    // <img> tag's data-image-list attribute at build time.
+    (function() {
+      const img = document.getElementById('cardMainImage');
+      if (!img) return;
+      let list;
+      try { list = JSON.parse(img.dataset.imageList || '[]'); }
+      catch { list = []; }
+      if (list.length < 2) return;
+
+      const prev = document.querySelector('.aa-prev-btn');
+      const next = document.querySelector('.aa-next-btn');
+      const counter = document.getElementById('aaCounter');
+      let idx = 0;
+
+      function show(i) {
+        idx = (i + list.length) % list.length;
+        const v = list[idx];
+        img.src = v.src;
+        img.srcset = v.srcset;
+        img.dataset.imageIndex = String(idx);
+        if (counter) counter.textContent = (idx + 1) + ' / ' + list.length;
+      }
+
+      prev?.addEventListener('click', () => show(idx - 1));
+      next?.addEventListener('click', () => show(idx + 1));
+
+      // Arrow-key support
+      document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        if (e.key === 'ArrowLeft') show(idx - 1);
+        else if (e.key === 'ArrowRight') show(idx + 1);
+      });
+    })();
+  </script>
+</Layout>

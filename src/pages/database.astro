@@ -1,0 +1,595 @@
+﻿---
+export const prerender = true;
+
+import Layout from '../layouts/Layout.astro';
+import Navigation from '../components/Navigation.astro';
+import SearchFilters from '../components/SearchFilters.astro';
+import { loadCardData } from '../utils/loadCardData.js';
+import { getImageUrl, getImageSrcSet, escapeHtml, getTcgAffiliateUrl } from '../utils/helpers.js';
+import { detectAbilities } from '../utils/cardConstants.js';
+
+const { cards } = await loadCardData();
+
+// Show ALL printings as separate tiles (matches optcg's pattern). The
+// #toggleAABtn next to the filter toggle cycles all â†’ aa-only â†’ regular-only.
+// `data-is-aa="1"` on tiles whose id contains `_` lets the JS filter them.
+//
+// Per-tile sibling-printing data was removed: the modal no longer ships
+// the variant cycler, so each tile only needs its own ID. Saved ~80-120KB
+// of inline JSON across the rendered HTML.
+
+const sortedCards = [...cards].sort((a, b) => {
+  const ca = a.cost ?? -1;
+  const cb = b.cost ?? -1;
+  if (cb !== ca) return cb - ca;
+  return (a.name || '').localeCompare(b.name || '');
+});
+
+const totalCards = sortedCards.length;
+const description = `Complete Star Wars Unlimited card list with ${totalCards.toLocaleString()} cards searchable by color, type, cost, AP/HP, and rarity. Card lookup with prices and tournament data.`;
+
+// LCP image is the first tile in the grid (matches the first card we render
+// with loading="eager" + fetchpriority="high"). Preload it so the browser can
+// fetch it in parallel with the HTML.
+const lcpCard = sortedCards[0];
+const lcpSrcSet = lcpCard ? getImageSrcSet(lcpCard) : null;
+---
+
+<Layout
+  title="Star Wars Unlimited Card List - Complete Star Wars Unlimited Database"
+  description={description}
+  canonical="https://www.swutcg.one/database"
+  pageId="database"
+>
+  {lcpSrcSet && (
+    <Fragment slot="head">
+      <link
+        rel="preload"
+        as="image"
+        href={lcpSrcSet.src}
+        imagesrcset={lcpSrcSet.srcset}
+        imagesizes={lcpSrcSet.sizes}
+        fetchpriority="high"
+      />
+    </Fragment>
+  )}
+  <script is:inline type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "Star Wars Unlimited Trading Card Game Database",
+    "description": `Complete searchable database of ${totalCards.toLocaleString()} Star Wars Unlimited cards with advanced filtering by ink, type, cost, and rarity.`,
+    "url": "https://www.swutcg.one/database",
+    "numberOfItems": totalCards
+  })}></script>
+
+  <script is:inline type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.swutcg.one/" },
+      { "@type": "ListItem", "position": 2, "name": "Database", "item": "https://www.swutcg.one/database" }
+    ]
+  })} />
+
+  <header>
+    <Navigation activePage="database" />
+    <h1>Star Wars Unlimited Card List</h1>
+    <p class="page-intro">
+      Complete <strong>Star Wars Unlimited card list</strong> with {totalCards.toLocaleString()} cards across every set. Filter, then <a href="/builder">build a deck</a>, <a href="/decklists">study tournament decklists</a>, or <a href="/how-to-play">learn the rules</a>.
+    </p>
+  </header>
+
+  <main class="database-page">
+    <SearchFilters />
+
+    <div id="cardsContainer" class="cards-grid" role="list" aria-live="polite" aria-label="Card search results">
+      {sortedCards.map((card, idx) => {
+        const img = getImageUrl(card);
+        const srcset = getImageSrcSet(card);
+        const inkKey = (card.color || '').toLowerCase();
+        const cost = card.cost ?? '';
+        const abilities = detectAbilities(card.action).join(',');
+        const cardPrice = card.price && Number(card.price) > 0 ? `$${Number(card.price).toFixed(2)}` : null;
+        const tcgUrl = getTcgAffiliateUrl(card.tcgPlayerId);
+        const altText = `${card.name} (${card.id})`;
+        const isAA = card.id.includes('_');
+        return (
+          <div
+            class="card"
+            role="listitem"
+            data-card-id={card.id}
+            data-slug={card.slug || card.id}
+            data-name={(card.name || '').toLowerCase()}
+            data-text={escapeHtml(card.action || '').toLowerCase()}
+            data-type={card.type || ''}
+            data-rarity={card.rarity || ''}
+            data-ink={inkKey}
+            data-cost={cost}
+            data-is-aa={isAA ? '1' : '0'}
+            data-card-name={card.name || ''}
+            data-card-ap={card.ap ?? ''}
+            data-card-hp={card.hp ?? ''}
+            data-card-level={card.level ?? ''}
+            data-card-zone={card.zone || ''}
+            data-card-trait={card.trait || ''}
+            data-card-link={card.link || ''}
+            data-card-source={card.source_title || ''}
+            data-card-action={card.action || ''}
+            data-card-tcg={tcgUrl || ''}
+            data-card-price={cardPrice || ''}
+            data-delta7d={card.delta7dPrice ?? ''}
+            data-abilities={abilities}
+          >
+            <a class="card-link" href={`/card/${card.slug || card.id}`} aria-label={altText}>
+              <div class="card-image">
+                {srcset ? (
+                  <img
+                    src={srcset.src}
+                    srcset={srcset.srcset}
+                    sizes={srcset.sizes}
+                    alt={altText}
+                    width="350"
+                    height="490"
+                    loading={idx < 12 ? 'eager' : 'lazy'}
+                    fetchpriority={idx < 12 ? 'high' : undefined}
+                    decoding="async"
+                  />
+                ) : img ? (
+                  <img src={img} alt={altText} width="350" height="490" loading="lazy" decoding="async" />
+                ) : (
+                  <div class="no-image">No Image</div>
+                )}
+              </div>
+            </a>
+            {cardPrice && tcgUrl && (
+              <a
+                href={tcgUrl}
+                target="_blank"
+                rel="noopener sponsored"
+                class="card-price-badge"
+                data-price-link
+              >
+                <span class="price-text">{cardPrice}</span>
+                <img src="/tcgplayer-logo.webp" alt="Buy on TCGPlayer" class="cart-icon" width="16" height="12" />
+              </a>
+            )}
+            {cardPrice && !tcgUrl && <div class="card-price-badge"><span class="price-text">{cardPrice}</span></div>}
+          </div>
+        );
+      })}
+    </div>
+
+    <div id="empty-state" class="empty-state" hidden>
+      <p>No cards match your filters.</p>
+      <button id="clearFiltersBtn" class="clear-btn">Clear all filters</button>
+    </div>
+
+    <noscript>
+      <div class="noscript-warn">JavaScript is required to filter the card database.</div>
+    </noscript>
+  </main>
+
+  <!-- Card preview modal â€” optcg pattern: modal-image + modal-details
+       containers populated by JS -->
+  <div id="cardModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalCardName">
+    <div class="modal-content">
+      <span class="close" role="button" tabindex="0" aria-label="Close modal" data-modal-close>&times;</span>
+      <div class="modal-image" id="modalImage"></div>
+      <div class="modal-details" id="modalDetails"></div>
+    </div>
+  </div>
+
+  <script is:inline>
+    function __databaseInit() {
+      const grid = document.getElementById('cardsContainer');
+      const empty = document.getElementById('empty-state');
+      const search = document.getElementById('searchBar');
+      const filtersRow = document.getElementById('filtersRow');
+      const toggleBtn = document.getElementById('filterToggleBtn');
+      const clearBtn = document.getElementById('clearFiltersBtn');
+      if (!grid) return;
+      const tiles = Array.from(grid.children);
+
+      const state = {
+        search: '',
+        inks: new Set(),
+        types: new Set(),
+        costs: new Set(),
+        abilities: new Set(),
+        // 'all' â†’ 'aa-only' â†’ 'regular-only' â†’ 'all' (matches optcg)
+        aaMode: 'all'
+      };
+
+      function chipsByGroup(group) {
+        return Array.from(document.querySelectorAll(`.${group}-filter .filter-chip`));
+      }
+
+      function bindGroup(group, attr, stateKey) {
+        chipsByGroup(group).forEach(chip => {
+          const value = chip.dataset[attr];
+          const toggle = () => {
+            if (state[stateKey].has(value)) {
+              state[stateKey].delete(value);
+              chip.classList.remove('active');
+              chip.setAttribute('aria-pressed', 'false');
+            } else {
+              state[stateKey].add(value);
+              chip.classList.add('active');
+              chip.setAttribute('aria-pressed', 'true');
+            }
+            applyFilters();
+          };
+          chip.addEventListener('click', toggle);
+          chip.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+          });
+        });
+      }
+
+      bindGroup('color', 'ink', 'inks');
+      bindGroup('type', 'type', 'types');
+      bindGroup('cost', 'cost', 'costs');
+      bindGroup('ability', 'ability', 'abilities');
+
+      let searchDebounce;
+      search.addEventListener('input', () => {
+        clearTimeout(searchDebounce);
+        searchDebounce = setTimeout(() => {
+          state.search = search.value.trim().toLowerCase();
+          applyFilters();
+        }, 120);
+      });
+
+      // Pre-fill from ?q= so the homepage hero search can deep-link here.
+      const urlQ = new URLSearchParams(window.location.search).get('q');
+      if (urlQ) {
+        search.value = urlQ;
+        state.search = urlQ.trim().toLowerCase();
+        applyFilters();
+      }
+
+      toggleBtn.addEventListener('click', () => {
+        filtersRow.classList.toggle('filters-visible');
+        toggleBtn.classList.toggle('active');
+      });
+
+      // AA toggle â€” 3-state cycle, mirrors optcg's #toggleAABtn:
+      //   default (no class)        â†’ all printings
+      //   .active                   â†’ AA-only (variant printings)
+      //   .inverse                  â†’ regular-only (base printings)
+      const aaBtn = document.getElementById('toggleAABtn');
+      if (aaBtn) {
+        aaBtn.addEventListener('click', () => {
+          if (state.aaMode === 'all') {
+            state.aaMode = 'aa-only';
+            aaBtn.classList.remove('inverse');
+            aaBtn.classList.add('active');
+            aaBtn.setAttribute('aria-pressed', 'true');
+            aaBtn.title = 'Showing: alternate art only (click for regular only)';
+          } else if (state.aaMode === 'aa-only') {
+            state.aaMode = 'regular-only';
+            aaBtn.classList.remove('active');
+            aaBtn.classList.add('inverse');
+            aaBtn.setAttribute('aria-pressed', 'mixed');
+            aaBtn.title = 'Showing: regular only (click to show all)';
+          } else {
+            state.aaMode = 'all';
+            aaBtn.classList.remove('active', 'inverse');
+            aaBtn.setAttribute('aria-pressed', 'false');
+            aaBtn.title = 'Toggle alternate art cards';
+          }
+          applyFilters();
+        });
+      }
+
+      clearBtn.addEventListener('click', () => {
+        state.search = '';
+        search.value = '';
+        ['inks','types','costs','abilities'].forEach(k => state[k].clear());
+        document.querySelectorAll('.filter-chip.active').forEach(c => {
+          c.classList.remove('active');
+          c.setAttribute('aria-pressed', 'false');
+        });
+        applyFilters();
+      });
+
+      function applyFilters() {
+        const q = state.search;
+        let visible = 0;
+        for (const tile of tiles) {
+          const ds = tile.dataset;
+          // AA filter â€” applies first since it's the cheapest check
+          if (state.aaMode === 'aa-only' && ds.isAa !== '1') {
+            tile.hidden = true; continue;
+          }
+          if (state.aaMode === 'regular-only' && ds.isAa === '1') {
+            tile.hidden = true; continue;
+          }
+          if (q && !(
+            ds.name.includes(q) ||
+            ds.text.includes(q) ||
+            ds.cardId.toLowerCase().includes(q) ||
+            (ds.cardTrait || '').toLowerCase().includes(q) ||
+            (ds.cardSource || '').toLowerCase().includes(q)
+          )) {
+            tile.hidden = true; continue;
+          }
+          if (state.inks.size && !state.inks.has(ds.ink)) {
+            tile.hidden = true; continue;
+          }
+          if (state.types.size && !state.types.has(ds.type)) {
+            tile.hidden = true; continue;
+          }
+          if (state.costs.size) {
+            const c = ds.cost;
+            if (state.costs.has('10')) {
+              if (!(state.costs.has(c) || (c !== '' && Number(c) >= 10))) {
+                tile.hidden = true; continue;
+              }
+            } else if (!state.costs.has(c)) {
+              tile.hidden = true; continue;
+            }
+          }
+          if (state.abilities.size) {
+            const tileAbilities = (ds.abilities || '').split(',').filter(Boolean);
+            const hasAny = Array.from(state.abilities).some(a => tileAbilities.includes(a));
+            if (!hasAny) { tile.hidden = true; continue; }
+          }
+          tile.hidden = false;
+          visible++;
+        }
+        empty.hidden = visible !== 0;
+      }
+    }
+
+    function __databaseModalInit() {
+      const modal = document.getElementById('cardModal');
+      if (!modal) return;
+      const grid = document.getElementById('cardsContainer');
+      if (!grid) return;
+      const modalImage = document.getElementById('modalImage');
+      const modalDetails = document.getElementById('modalDetails');
+      const allTiles = Array.from(grid.children);
+      let currentTile = null;
+
+      const COLOR_LABEL = {
+        blue: 'Blue', green: 'Green', purple: 'Purple', red: 'Red', white: 'White'
+      };
+
+      function el(tag, className, text) {
+        const e = document.createElement(tag);
+        if (className) e.className = className;
+        if (text != null) e.textContent = text;
+        return e;
+      }
+
+      function statRow(label, value, opts) {
+        opts = opts || {};
+        const row = el('div', 'stat-row' + (opts.span ? ' col-span-full' : ''));
+        row.appendChild(el('span', 'modal-stat-label', label));
+        if (opts.href) {
+          const a = el('a', 'modal-stat-value modal-card-link', String(value));
+          a.href = opts.href;
+          row.appendChild(a);
+        } else {
+          const span = el('span', 'modal-stat-value', String(value));
+          if (opts.color) span.style.color = opts.color;
+          row.appendChild(span);
+        }
+        return row;
+      }
+
+      function visibleTiles() {
+        return allTiles.filter(t => !t.hidden);
+      }
+
+      function navigate(direction) {
+        const visible = visibleTiles();
+        if (!visible.length || !currentTile) return;
+        let idx = visible.indexOf(currentTile);
+        if (idx === -1) idx = 0;
+        const next = visible[(idx + direction + visible.length) % visible.length];
+        render(next);
+      }
+
+      function render(tile) {
+        currentTile = tile;
+        const d = tile.dataset;
+        const cardId = d.cardId;
+        // Display ID hides the alt-print suffix (_p1, _p2, ...) so the user
+        // sees the canonical Fantasy Flight Games card code. The internal cardId stays
+        // unchanged for image lookups, slug routing, etc.
+        const displayId = cardId.split('_')[0];
+
+        // Image â€” single printing only. The variant chip strip below
+        // (rendered in modalDetails) still lets users open alt-arts.
+        modalImage.replaceChildren();
+        modalImage.classList.add('modal-image-cycler');
+
+        const img = el('img');
+        img.src = `/cards/${cardId}-640w.webp`;
+        img.srcset = `/cards/${cardId}-640w.webp 640w, /cards/${cardId}.webp 1600w`;
+        img.sizes = '(max-width: 767px) 280px, 350px';
+        img.alt = `Card art for ${d.cardName} (${displayId})`;
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        modalImage.appendChild(img);
+
+        // Details
+        modalDetails.replaceChildren();
+
+        // Title nav: â€¹ Name â€º  (matches optcg's modal-title-nav)
+        const titleNav = el('div', 'modal-title-nav');
+        const prev = el('span', 'modal-nav-arrow prev', '<');
+        prev.setAttribute('role', 'button');
+        prev.setAttribute('tabindex', '0');
+        prev.setAttribute('aria-label', 'Previous card');
+        prev.addEventListener('click', () => navigate(-1));
+        const titleEl = el('h2', null, d.cardName);
+        titleEl.id = 'modalCardName';
+        const next = el('span', 'modal-nav-arrow next', '>');
+        next.setAttribute('role', 'button');
+        next.setAttribute('tabindex', '0');
+        next.setAttribute('aria-label', 'Next card');
+        next.addEventListener('click', () => navigate(1));
+        titleNav.appendChild(prev);
+        titleNav.appendChild(titleEl);
+        titleNav.appendChild(next);
+        modalDetails.appendChild(titleNav);
+
+        // Stats â€” Star Wars Unlimited: ID/Type/Color/Rarity/Cost/Lv/AP/HP/Zone/Trait/Link.
+        // dotgg uses '-' as a placeholder for "not applicable"; treat as empty.
+        const has = (v) => v != null && v !== '' && v !== '-';
+        const stats = el('div', 'modal-stats');
+        stats.appendChild(statRow('ID', displayId, { href: `/card/${d.slug}` }));
+        if (d.type)               stats.appendChild(statRow('Type', d.type));
+        if (d.ink)                stats.appendChild(statRow('Color', COLOR_LABEL[d.ink] || d.ink));
+        if (d.rarity)             stats.appendChild(statRow('Rarity', d.rarity));
+        if (has(d.cost))          stats.appendChild(statRow('Cost', d.cost));
+        if (has(d.cardLevel))     stats.appendChild(statRow('Lv', d.cardLevel));
+        if (has(d.cardAp))        stats.appendChild(statRow('AP', d.cardAp));
+        if (has(d.cardHp))        stats.appendChild(statRow('HP', d.cardHp));
+        if (has(d.cardZone))      stats.appendChild(statRow('Zone', d.cardZone));
+        if (has(d.cardTrait))     stats.appendChild(statRow('Trait', d.cardTrait, { span: true }));
+        if (has(d.cardLink))      stats.appendChild(statRow('Link', d.cardLink, { span: true }));
+        if (has(d.cardSource))    stats.appendChild(statRow('Source', d.cardSource, { span: true }));
+
+        // Price row with TCGPlayer logo â€” always full-width so it
+        // doesn't end up sharing a row with another stat
+        if (d.cardTcg && d.cardPrice) {
+          const priceRow = el('div', 'stat-row col-span-full');
+          priceRow.appendChild(el('span', 'modal-stat-label', 'Price'));
+          const a = el('a', 'modal-stat-value modal-price-link');
+          a.href = d.cardTcg;
+          a.target = '_blank';
+          a.rel = 'noopener sponsored';
+          a.appendChild(el('span', null, d.cardPrice));
+          const logo = el('img', 'modal-tcg-logo');
+          logo.src = '/tcgplayer-logo.webp';
+          logo.alt = 'View on TCGPlayer';
+          logo.width = 19;
+          logo.height = 14;
+          a.appendChild(logo);
+          priceRow.appendChild(a);
+          stats.appendChild(priceRow);
+        }
+
+        // 7-day change row (green/red) â€” also full-width
+        if (d.delta7d && d.cardPrice) {
+          const delta = parseFloat(d.delta7d);
+          const cur = parseFloat(d.cardPrice.replace('$', ''));
+          if (!isNaN(delta) && delta !== 0 && cur > 0) {
+            const prevPrice = cur - delta;
+            const pct = prevPrice > 0 ? (delta / prevPrice) * 100 : 0;
+            const formatted = pct > 0 ? `+${pct.toFixed(1)}%` : `${pct.toFixed(1)}%`;
+            const color = pct > 0 ? '#22c55e' : pct < 0 ? '#ef4444' : '';
+            stats.appendChild(statRow('7-Day Change', formatted, { color, span: true }));
+          }
+        }
+
+        modalDetails.appendChild(stats);
+
+        // Effect block â€” apply Star Wars Unlimited effect formatting
+        if (d.cardAction) {
+          const fx = el('div', 'modal-effect');
+          fx.appendChild(el('h3', null, 'Effect'));
+          const p = el('p');
+          p.innerHTML = formatEffect(d.cardAction);
+          fx.appendChild(p);
+          modalDetails.appendChild(fx);
+        }
+      }
+
+      // Inline copy of boldKeywords from cardConstants.js â€” Astro
+      // <script is:inline> can't import. Keep in sync.
+      const _KW_NAMES = ['Repair','Breach','Support','Blocker','First Strike',
+                         'High-Maneuver','Suppression'];
+      const _ABILITY_RE = /(\b[A-Z][A-Z'!]*(?![a-z])(?:[\s,]+(?:[A-Z][A-Z'!]*(?![a-z])|\+\d+))+|\b[A-Z]{2,}[A-Z'!]*(?![a-z]))/g;
+
+      function formatEffect(text) {
+        if (!text) return '';
+        if (/<(?:mark|b|i|br)[\s>/]/i.test(text)) return _convertHtml(text);
+        return _formatPlain(text);
+      }
+
+      function _convertHtml(text) {
+        return text
+          .replace(/<br\s*\/?>/gi, '\x01BR\x01')
+          .replace(/<mark[^>]*>\s*([\s\S]*?)\s*<\/mark>/gi, '<span class="effect-ability">$1</span>')
+          .replace(/<b\b[^>]*>([\s\S]*?)<\/b>/gi, '<strong class="effect-keyword">$1</strong>')
+          .replace(/<i\b[^>]*>([\s\S]*?)<\/i>/gi, '<em class="effect-reminder">$1</em>')
+          .replace(/\x01BR\x01/g, '<br>')
+          .replace(/\n+/g, ' ')
+          .replace(/[ \t]+/g, ' ')
+          .trim();
+      }
+
+      function _formatPlain(text) {
+        let s = text
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        const kwAlt = _KW_NAMES.join('|');
+        const phrase = '(?:[A-Z][A-Z\\\'!]*(?![a-z])(?:[\\s,]+(?:[A-Z][A-Z\\\'!]*(?![a-z])|\\+\\d+))+|[A-Z]{2,}[A-Z\\\'!]*(?![a-z])|' + kwAlt + ')';
+        s = s.replace(new RegExp('\\n(' + phrase + ')', 'g'), '\x01PARA\x01$1');
+        s = s.replace(/\s*\n+\s*/g, ' ').trim();
+        s = s.replace(/\x01PARA\x01/g, '<br>');
+        const parts = s.split(/(\([^)]+\))/);
+        return parts.map((part, i) => {
+          if (i % 2 === 1) return '<em class="effect-reminder">' + part + '</em>';
+          return _formatOuter(part);
+        }).join('');
+      }
+
+      function _formatOuter(s) {
+        s = s.replace(_ABILITY_RE, '<span class="effect-ability">$1</span>');
+        for (const kw of _KW_NAMES) {
+          const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const re = new RegExp('\\b(' + escaped + '(?:\\s\\+?\\d+)?)\\b', 'g');
+          s = s.replace(re, '<strong class="effect-keyword">$1</strong>');
+        }
+        return s;
+      }
+
+      function open(tile) {
+        render(tile);
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function close() {
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+        currentTile = null;
+      }
+
+      grid.addEventListener('click', e => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+        if (e.target.closest('[data-price-link]')) return;
+        const tile = e.target.closest('.card');
+        if (!tile) return;
+        e.preventDefault();
+        open(tile);
+      });
+
+      modal.addEventListener('click', e => {
+        if (e.target === modal || e.target.closest('[data-modal-close]')) close();
+      });
+      document.addEventListener('keydown', e => {
+        if (!modal.classList.contains('show')) return;
+        if (e.key === 'Escape') close();
+        else if (e.key === 'ArrowLeft')  navigate(-1);
+        else if (e.key === 'ArrowRight') navigate(1);
+      });
+    }
+
+    // Bind on every page-load (Astro fires this for initial load AND
+    // after every ClientRouter navigation). Without this, returning to
+    // /database via top-nav would leave the click handler unbound and
+    // a card click would navigate to /card/{id} instead of the modal.
+    document.addEventListener('astro:page-load', () => {
+      __databaseInit();
+      __databaseModalInit();
+    });
+  </script>
+</Layout>

@@ -1,0 +1,834 @@
+﻿---
+export const prerender = true;
+
+import Layout from '../layouts/Layout.astro';
+import Navigation from '../components/Navigation.astro';
+import { loadDecklists } from '../utils/loadDecklists.js';
+import { loadCardData } from '../utils/loadCardData.js';
+import { getImageUrl, getImageSrcSet } from '../utils/helpers.js';
+import { COLORS } from '../utils/cardConstants.js';
+
+interface DeckCard {
+  id: string; qty: number; name?: string; slug?: string; type?: string;
+  color?: string; cost?: number | null; level?: number | null;
+  ap?: number | null; hp?: number | null; rarity?: string;
+  tcgPlayerId?: string | number; price?: number | null;
+}
+interface Deck {
+  set: string; setName: string; sourceUrl: string;
+  tournament: string; host: string; date: string;
+  country: string; author: string; placement: string;
+  deckColor: string; deckName: string; deckProfile: string;
+  cardCount: number; uniqueCards: number;
+  colors: string[]; cards: DeckCard[];
+}
+
+const { decks } = await loadDecklists() as
+  { decks: Deck[]; fetchedAt: string | null; source: string | null };
+
+// Full card pool â€” needed client-side so the TCGplayer Buy modal can
+// cycle through alt-art printings. Stripped to the bare fields the
+// modal renders, plus baseId for AA grouping.
+const { cards: allCards } = await loadCardData() as { cards: any[] };
+const cardPool = allCards.map(c => ({
+  id: c.id,
+  baseId: c.id?.split('_')[0],
+  name: c.name,
+  tcgPlayerId: c.tcgPlayerId || null,
+  price: c.price ?? null,
+}));
+
+const totalDecks = decks.length;
+// "Last refreshed" reflects the date of the most recent deck â€” the data
+// we actually serve â€” rather than the scrape timestamp (which can refresh
+// daily even when no new decks are published).
+const lastDeckDate: string | null = decks
+  .map(d => d.date)
+  .filter((d): d is string => !!d)
+  .sort()
+  .pop() || null;
+const description = totalDecks > 0
+  ? `${totalDecks} tournament-winning Star Wars Unlimited decklists from competitive events. Browse top decks by color, see exact 50-card builds with prices.`
+  : `Star Wars Unlimited tournament decklists. Pipeline pending, check back as new tournaments are reported.`;
+
+const COLOR_HEX = Object.fromEntries(COLORS.map(c => [c.key, c.hex]));
+
+function pairFill(parts: string[]): string {
+  const c1 = COLOR_HEX[parts[0]] || '#888';
+  if (parts.length < 2) return c1;
+  const c2 = COLOR_HEX[parts[1]] || '#888';
+  return `linear-gradient(90deg, ${c1}, ${c2})`;
+}
+
+// Top deck-name buckets for the Meta Snapshot (replaces color-pair grouping).
+const deckNameCounts: Record<string, { count: number; colors: string[] }> = {};
+for (const d of decks) {
+  const key = (d.deckName || '').trim() || 'Unknown';
+  if (!deckNameCounts[key]) deckNameCounts[key] = { count: 0, colors: d.colors || [] };
+  deckNameCounts[key].count += 1;
+}
+const topDeckNames = Object.entries(deckNameCounts)
+  .sort((a, b) => b[1].count - a[1].count)
+  .slice(0, 10)
+  .map(([name, info]) => ({ name, count: info.count, colors: info.colors }));
+
+function formatDate(iso: string): string {
+  if (!iso) return '';
+  const [y, m] = iso.split('-');
+  if (!y || !m) return iso;
+  return `${m}/${y.slice(-2)}`;
+}
+
+function deckTotalPrice(cards: DeckCard[]): number {
+  return cards.reduce((sum, c) => sum + (c.price ? Number(c.price) * c.qty : 0), 0);
+}
+
+function deckExportText(cards: DeckCard[]): string {
+  return cards.map(c => `${c.qty} ${c.id}`).join('\n');
+}
+
+// Hero cards for the leftmost ViewDeck column. Pick the deck's most
+// recognizable Units (Mobile Suits): rarest first, then most-played,
+// then highest cost. Excluding Resources / Pilots / Commands / Bases
+// keeps the strip focused on the iconic anime mecha so the same
+// archetype renders the same image set every time.
+const RARITY_ORDER = ['LR', 'SR', 'R', 'U', 'C', 'P'];
+function pickHeroes(cards: DeckCard[], n = 2): DeckCard[] {
+  return cards
+    .filter(c => (c.type || '').toLowerCase() === 'unit')
+    .sort((a, b) => {
+      const ra = RARITY_ORDER.indexOf(a.rarity || 'C');
+      const rb = RARITY_ORDER.indexOf(b.rarity || 'C');
+      if (ra !== rb) return ra - rb;
+      if ((b.qty || 0) !== (a.qty || 0)) return (b.qty || 0) - (a.qty || 0);
+      return (b.cost ?? -1) - (a.cost ?? -1);
+    })
+    .slice(0, n);
+}
+
+// Group cards by type for the expanded view.
+const TYPE_ORDER = ['Unit', 'Pilot', 'Command', 'Base', 'Resource'];
+function groupByType(cards: DeckCard[]) {
+  const buckets: Record<string, DeckCard[]> = {};
+  for (const c of cards) {
+    const t = c.type || 'Other';
+    (buckets[t] ||= []).push(c);
+  }
+  return TYPE_ORDER
+    .filter(t => buckets[t]?.length)
+    .map(t => ({
+      key: t,
+      label: t + 's',
+      cards: buckets[t],
+      total: buckets[t].reduce((s, c) => s + c.qty, 0)
+    }));
+}
+---
+
+<Layout
+  title="Star Wars Unlimited Top Decks & Tournament Decklists - Card Game Meta"
+  description={description}
+  canonical="https://www.swutcg.one/decklists"
+  pageId="decklists"
+>
+  <script is:inline type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "Star Wars Unlimited Tournament Decklists",
+    "description": description,
+    "url": "https://www.swutcg.one/decklists",
+    "numberOfItems": totalDecks
+  })} />
+  <script is:inline type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.swutcg.one/" },
+      { "@type": "ListItem", "position": 2, "name": "Decklists", "item": "https://www.swutcg.one/decklists" }
+    ]
+  })} />
+
+  <header>
+    <Navigation activePage="decklists" />
+    <h1>Star Wars Unlimited Top Decks &amp; Tournament Decklists</h1>
+    <p class="page-intro">
+      {totalDecks} <strong>tournament-winning Star Wars Unlimited decks</strong>. <a href="/builder">Open any in the deck builder</a>, <a href="/database">search the card list</a>, or <a href="/how-to-play">learn the rules</a>.
+      {lastDeckDate && (() => {
+        const [y, m, d] = lastDeckDate.slice(0, 10).split('-');
+        return <span class="meta-note"> Â· last refreshed {d}/{m}/{y}</span>;
+      })()}
+    </p>
+  </header>
+
+  <main class="decklists-page">
+
+    {totalDecks === 0 ? (
+      <section class="empty-state">
+        <h2>New tournament results coming soon</h2>
+        <p>We're between events right now. Check back shortly. Fresh decklists land here as soon as the next major Star Wars Unlimited tournament wraps up. In the meantime, browse the <a href="/database">card database</a> or try the <a href="/builder">deck builder</a>.</p>
+      </section>
+    ) : (
+      <div class="decklists-layout">
+        <section class="decklists-table-section">
+          <div class="decklists-search-row">
+            <input
+              type="search"
+              id="decklistsSearch"
+              class="decklists-search"
+              placeholder="Search by deck name or event..."
+              aria-label="Filter decklists"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <span class="decklists-search-count" id="decklistsSearchCount" aria-live="polite"></span>
+          </div>
+          <table id="decklistsTable">
+            <thead>
+              <tr>
+                <th class="th-date">Date</th>
+                <th class="th-leader">Deck</th>
+                <th class="th-event">Event</th>
+                <th class="th-result">Place</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              {decks.map((deck, idx) => {
+                const totalPrice = deckTotalPrice(deck.cards);
+                const hasAnyTcgId = deck.cards.some(c => !!c.tcgPlayerId);
+                const exportText = deckExportText(deck.cards);
+                const heroes = pickHeroes(deck.cards, 2);
+                return (
+                  <>
+                    <tr class="deck-row" id={`deck-${idx}`} data-deck-id={idx} data-colors={deck.colors.join(',')}>
+                      <td class="col-date">{formatDate(deck.date)}</td>
+                      <td class="col-leader">
+                        <div class="deck-cell">
+                          <div class="hero-stack">
+                            {heroes.map(h => {
+                              const ss = getImageSrcSet({ id: h.id });
+                              return ss ? (
+                                <img
+                                  class="hero-thumb"
+                                  src={ss.src}
+                                  srcset={ss.srcset}
+                                  sizes="56px"
+                                  width="160"
+                                  height="224"
+                                  alt={h.name || h.id}
+                                  loading="lazy"
+                                  decoding="async"
+                                />
+                              ) : null;
+                            })}
+                          </div>
+                          <div class="deck-name">{deck.deckName || '-'}</div>
+                        </div>
+                      </td>
+                      <td class="col-event">
+                        <div class="event-name">{deck.tournament || '-'}</div>
+                      </td>
+                      <td class="col-result">{(deck.placement || '').replace(/\s*place\s*$/i, '').trim() || '-'}</td>
+                    </tr>
+                    <tr class="deck-row-expanded" data-deck-id={idx} hidden>
+                      <td colspan="4">
+                        <div class="expanded-content">
+                          {groupByType(deck.cards).map(group => (
+                            <div class="deck-type-group">
+                              <h3 class="deck-type-label">{group.label} ({group.total})</h3>
+                              <div class="deck-grid">
+                                {group.cards.map(card => {
+                                  const ss = card.id ? getImageSrcSet({ id: card.id }) : null;
+                                  const img = card.id ? getImageUrl({ id: card.id }) : null;
+                                  return (
+                                    <div class="deck-card-tile" data-card-id={card.id} title={card.name || card.id}>
+                                      {ss ? (
+                                        <img src={ss.src} srcset={ss.srcset} sizes="(max-width: 767px) 68px, 88px" alt={card.name || card.id} loading="lazy" decoding="async" width="160" height="224" />
+                                      ) : img ? (
+                                        <img src={img} alt={card.name || card.id} loading="lazy" decoding="async" width="160" height="224" />
+                                      ) : (
+                                        <div class="no-image">{card.id}</div>
+                                      )}
+                                      <div class="qty-badge">{card.qty}</div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                          <div class="deck-actions">
+                            <button type="button" class="deck-action-btn copy-btn" data-export={exportText}>Copy / Export</button>
+                            <a href={`/builder?deck=${idx}`} class="deck-action-btn use-btn">Use in Builder</a>
+                            {hasAnyTcgId && totalPrice > 0 && (
+                              <button type="button" class="deck-action-btn buy-btn" data-deck-idx={idx}>
+                                <span class="buy-price">${totalPrice.toFixed(2)}</span>
+                                <span class="buy-cart-icon" aria-hidden="true"></span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  </>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+
+        <aside class="decklists-meta">
+          <h2>Meta Snapshot</h2>
+          <ol class="meta-list">
+            {topDeckNames.map(d => (
+              <li class="meta-row">
+                <span class="meta-label" title={d.name}>{d.name}</span>
+                <span class="meta-bar"><span class="meta-bar-fill" style={`width:${(d.count / topDeckNames[0].count) * 100}%; background:${d.colors.length === 0 ? 'var(--color-bg-tertiary)' : pairFill(d.colors)}`}></span></span>
+                <span class="meta-count">{d.count}</span>
+              </li>
+            ))}
+          </ol>
+          {topDeckNames.length > 0 && (
+            <p class="meta-snapshot-prose">
+              The current <strong>Star Wars Unlimited</strong> meta is led by <strong>{topDeckNames.slice(0, 3).map(d => d.name).join(', ')}</strong>, which together account for <strong>{Math.round(topDeckNames.slice(0, 3).reduce((s, d) => s + d.count, 0) / Math.max(1, totalDecks) * 100)}%</strong> of tracked tournament decks. Across {totalDecks} competitive lists, <strong>{topDeckNames[0].name}</strong> is the most-played archetype. Search by deck name above, or click any row to see the full 50-card breakdown.
+            </p>
+          )}
+          <p class="meta-source">
+            {totalDecks} decks tracked
+          </p>
+        </aside>
+      </div>
+    )}
+  </main>
+
+  <!-- Cursor-following preview for cards inside the expanded deck rows -->
+  <div id="cardHoverPreview" aria-hidden="true"></div>
+
+  <!-- TCGplayer Buy modal â€” same alt-art-cycling pattern as /builder -->
+  <div id="tcgPlayerModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="tcgModalTitle" hidden>
+    <div class="modal-content tcg-modal-content">
+      <button type="button" class="modal-close" id="tcgClose" aria-label="Close">&times;</button>
+      <h2 id="tcgModalTitle" class="sr-only">Buy deck on TCGplayer</h2>
+      <div class="modal-body">
+        <div class="tcg-card-list" id="tcgCardList"></div>
+      </div>
+      <div class="modal-footer">
+        <div class="footer-left">
+          <button type="button" id="toggleSelectAllBtn" class="select-btn">Unselect All</button>
+        </div>
+        <div class="footer-right">
+          <div class="total-price">Total: <span id="totalPrice">$0.00</span></div>
+          <button type="button" id="buyOnTCGPlayer" class="tcg-buy-btn" disabled>Buy on TCGplayer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card pool for the modal's AA cycling -->
+  <script is:inline type="application/json" id="card-pool" set:html={JSON.stringify(cardPool)}></script>
+
+  <!-- One entry per deck â€” { idx: [{id, qty}, ...] } so the modal can
+       look up exactly what's in the deck without rebuilding from DOM -->
+  <script is:inline type="application/json" id="deck-payloads" set:html={JSON.stringify(
+    decks.map(d => ({
+      idx: decks.indexOf(d),
+      cards: d.cards.map(c => ({ id: c.id, qty: c.qty }))
+    }))
+  )}></script>
+
+  <script is:inline>
+    (function() {
+      const tbody = document.getElementById('tableBody');
+      if (!tbody) return;
+      const expanded = {};
+      document.querySelectorAll('.deck-row-expanded').forEach(r => {
+        expanded[r.dataset.deckId] = r;
+      });
+
+      tbody.addEventListener('click', e => {
+        if (e.target.closest('button, a')) return;
+        const main = e.target.closest('.deck-row');
+        if (!main) return;
+        const exp = expanded[main.dataset.deckId];
+        if (!exp) return;
+        const isOpen = !exp.hidden;
+        exp.hidden = isOpen;
+        main.classList.toggle('expanded', !isOpen);
+      });
+
+      // Auto-expand the row pointed to by the URL hash (e.g. #deck-3 from
+      // the homepage's "Top Tournament Decks" cards). Runs on initial load
+      // and on hashchange so back/forward navigation re-applies it.
+      function openFromHash() {
+        const m = (location.hash || '').match(/^#deck-(\d+)$/);
+        if (!m) return;
+        const main = document.getElementById('deck-' + m[1]);
+        if (!main) return;
+        const exp = expanded[main.dataset.deckId];
+        if (exp && exp.hidden) {
+          exp.hidden = false;
+          main.classList.add('expanded');
+        }
+        main.scrollIntoView({ block: 'start', behavior: 'auto' });
+      }
+      openFromHash();
+      window.addEventListener('hashchange', openFromHash);
+
+      // Search filter â€” matches deck name, event name, and any visible
+      // text inside each row. Hides the expanded row alongside its
+      // parent so filtering doesn't leave orphan card grids behind.
+      const searchInput = document.getElementById('decklistsSearch');
+      const searchCount = document.getElementById('decklistsSearchCount');
+      const totalRows = tbody.querySelectorAll('.deck-row').length;
+      function applySearch() {
+        const q = (searchInput.value || '').trim().toLowerCase();
+        let visible = 0;
+        tbody.querySelectorAll('.deck-row').forEach(row => {
+          const hit = !q || row.textContent.toLowerCase().includes(q);
+          row.style.display = hit ? '' : 'none';
+          const exp = expanded[row.dataset.deckId];
+          if (exp) exp.style.display = hit ? '' : 'none';
+          if (hit) visible++;
+        });
+        searchCount.textContent = q
+          ? `${visible} of ${totalRows} decks`
+          : '';
+      }
+      if (searchInput) {
+        searchInput.addEventListener('input', applySearch);
+      }
+
+      // Copy / Export
+      tbody.addEventListener('click', e => {
+        const btn = e.target.closest('.copy-btn');
+        if (!btn) return;
+        e.preventDefault(); e.stopPropagation();
+        navigator.clipboard.writeText(btn.dataset.export || '').then(() => {
+          const orig = btn.textContent;
+          btn.textContent = 'Copied!';
+          btn.classList.add('copied');
+          setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+        });
+      });
+
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // CURSOR-FOLLOWING HOVER PREVIEW (desktop only)
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      const preview = document.getElementById('cardHoverPreview');
+      const canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+      if (canHover && preview) {
+        const PREVIEW_W = 320;
+        const OFFSET = 20;
+        let currentSrc = '';
+
+        const showPreview = (e, cardId) => {
+          if (!cardId) return;
+          const src = '/cards/' + cardId + '-640w.webp';
+          if (src !== currentSrc) {
+            preview.innerHTML = '<img src="' + src + '" alt="" />';
+            currentSrc = src;
+          }
+          let left = e.clientX + OFFSET;
+          let top = e.clientY;
+          if (left + PREVIEW_W > window.innerWidth) left = e.clientX - PREVIEW_W - OFFSET;
+          const halfH = PREVIEW_W * 0.7;
+          if (top - halfH < 0) top = halfH + 10;
+          if (top + halfH > window.innerHeight) top = window.innerHeight - halfH - 10;
+          preview.style.left = left + 'px';
+          preview.style.top = top + 'px';
+          preview.style.transform = 'translateY(-50%)';
+          preview.style.display = 'block';
+        };
+        const hidePreview = () => {
+          preview.style.display = 'none';
+          currentSrc = '';
+        };
+
+        tbody.addEventListener('mousemove', (e) => {
+          const tile = e.target.closest('.deck-card-tile');
+          if (!tile) { hidePreview(); return; }
+          const cardId = tile.dataset.cardId;
+          if (!cardId) { hidePreview(); return; }
+          showPreview(e, cardId);
+        });
+        tbody.addEventListener('mouseleave', hidePreview);
+      }
+
+      // Touch devices: tap any card tile in an expanded deck row to open
+      // the full-size image as a centered overlay; tap anywhere to dismiss.
+      if (!canHover && preview) {
+        tbody?.addEventListener('click', (e) => {
+          const tile = e.target.closest('.deck-card-tile');
+          if (!tile) return;
+          const cardId = tile.dataset.cardId;
+          if (!cardId) return;
+          e.stopPropagation();
+          preview.innerHTML = '<img src="/cards/' + cardId + '-640w.webp" alt="" />';
+          preview.classList.add('preview-centered');
+          preview.style.display = 'block';
+        });
+        document.addEventListener('click', (e) => {
+          if (preview.style.display === 'block' && !preview.contains(e.target)) {
+            preview.style.display = 'none';
+            preview.classList.remove('preview-centered');
+          }
+        });
+      }
+
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // TCGPLAYER BUY MODAL (per-deck)
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      let cardPool = [];
+      let cardById = new Map();
+      let deckPayloads = [];
+      try {
+        cardPool = JSON.parse(document.getElementById('card-pool').textContent || '[]');
+        deckPayloads = JSON.parse(document.getElementById('deck-payloads').textContent || '[]');
+        cardById = new Map(cardPool.map(c => [c.id, c]));
+      } catch {}
+
+      const TCG_AFFILIATE_BASE = 'https://partner.tcgplayer.com/c/7021525/1780961/21018';
+      const tcgModal = document.getElementById('tcgPlayerModal');
+      const tcgCardList = document.getElementById('tcgCardList');
+      const totalPriceLabel = document.getElementById('totalPrice');
+      const buyOnTCGBtn = document.getElementById('buyOnTCGPlayer');
+      const tcgClose = document.getElementById('tcgClose');
+
+      const escAttr = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+      function recalcTotal() {
+        let total = 0, anySelected = false;
+        tcgCardList.querySelectorAll('.tcg-card-item').forEach(item => {
+          const cb = item.querySelector('.tcg-card-checkbox');
+          if (!cb || cb.disabled) { item.classList.remove('selected'); return; }
+          const qty = Math.max(1, Math.min(99, parseInt(item.querySelector('.tcg-quantity-input').value) || 1));
+          const price = parseFloat(item.dataset.price) || 0;
+          if (cb.checked) {
+            total += price * qty;
+            item.classList.add('selected');
+            anySelected = true;
+          } else {
+            item.classList.remove('selected');
+          }
+        });
+        totalPriceLabel.textContent = '$' + total.toFixed(2);
+        buyOnTCGBtn.disabled = !anySelected;
+        const tBtn = document.getElementById('toggleSelectAllBtn');
+        if (tBtn) tBtn.textContent = anySelected ? 'Unselect All' : 'Select All';
+      }
+
+      function openBuyModal(deckIdx) {
+        const payload = deckPayloads[deckIdx];
+        if (!payload) return;
+        const html = payload.cards.map(({ id, qty }) => {
+          const c = cardById.get(id);
+          if (!c) return '';
+          const price = c.price ? Number(c.price) : 0;
+          const tpid = c.tcgPlayerId || '';
+          const buyable = price > 0 && tpid;
+          const totalCardPrice = (price * qty).toFixed(2);
+          const siblings = cardPool.filter(s => s.baseId === c.baseId);
+          const hasVariants = siblings.length > 1;
+          return `
+            <div class="tcg-card-item ${buyable ? 'selected' : 'disabled'}"
+                 data-card-id="${escAttr(id)}" data-tcg-id="${escAttr(tpid)}"
+                 data-price="${price}" data-qty="${qty}">
+              <input type="checkbox" class="tcg-card-checkbox" ${buyable ? 'checked' : 'disabled'}>
+              <div class="tcg-card-img-wrapper">
+                ${hasVariants ? '<button type="button" class="tcg-aa-prev-btn tcg-aa-badge-left" aria-label="Previous printing">â—€</button>' : ''}
+                <img class="tcg-card-img"
+                     src="/cards/${escAttr(id)}-160w.webp"
+                     srcset="/cards/${escAttr(id)}-160w.webp 160w, /cards/${escAttr(id)}-640w.webp 640w"
+                     sizes="120px" width="160" height="224"
+                     alt="${escAttr(c.name || id)}" />
+                ${hasVariants ? '<button type="button" class="tcg-aa-next-btn tcg-aa-badge-right" aria-label="Next printing">â–¶</button>' : ''}
+              </div>
+              <div class="tcg-card-info">
+                <div class="tcg-card-name">${escAttr(c.name || id)}</div>
+                <div class="tcg-card-quantity">
+                  <input type="number" class="tcg-quantity-input" min="1" max="99" value="${qty}" ${buyable ? '' : 'disabled'}>
+                  <div class="tcg-card-price">${price > 0 ? '$' + totalCardPrice : 'N/A'}</div>
+                </div>
+              </div>
+            </div>
+          `;
+        }).filter(Boolean).join('');
+        tcgCardList.innerHTML = html;
+        tcgModal.hidden = false;
+        recalcTotal();
+      }
+
+      function cycleVariant(item, direction) {
+        const cardId = item.dataset.cardId;
+        const card = cardById.get(cardId);
+        if (!card) return;
+        const siblings = cardPool
+          .filter(s => s.baseId === card.baseId)
+          .sort((a, b) => Number(a.tcgPlayerId || 0) - Number(b.tcgPlayerId || 0));
+        if (siblings.length <= 1) return;
+        const curIdx = siblings.findIndex(s => s.id === cardId);
+        const next = siblings[(curIdx + direction + siblings.length) % siblings.length];
+        const buyable = next.tcgPlayerId && next.price > 0;
+        const qty = parseInt(item.dataset.qty) || 1;
+        item.dataset.cardId = next.id;
+        item.dataset.tcgId = next.tcgPlayerId || '';
+        item.dataset.price = String(next.price ?? 0);
+        item.classList.toggle('disabled', !buyable);
+        const img = item.querySelector('.tcg-card-img');
+        if (img) {
+          img.src = `/cards/${next.id}-160w.webp`;
+          img.srcset = `/cards/${next.id}-160w.webp 160w, /cards/${next.id}-640w.webp 640w`;
+          img.alt = next.name || next.id;
+        }
+        const cb = item.querySelector('.tcg-card-checkbox');
+        if (cb) { cb.disabled = !buyable; cb.checked = buyable; }
+        const qtyInput = item.querySelector('.tcg-quantity-input');
+        if (qtyInput) qtyInput.disabled = !buyable;
+        const priceEl = item.querySelector('.tcg-card-price');
+        if (priceEl) priceEl.textContent = next.price > 0 ? '$' + ((next.price ?? 0) * qty).toFixed(2) : 'N/A';
+        recalcTotal();
+      }
+
+      // Buy button on each deck row
+      tbody.addEventListener('click', e => {
+        const btn = e.target.closest('.buy-btn');
+        if (!btn) return;
+        e.preventDefault(); e.stopPropagation();
+        openBuyModal(parseInt(btn.dataset.deckIdx) || 0);
+      });
+
+      tcgClose?.addEventListener('click', () => { tcgModal.hidden = true; });
+      tcgModal?.addEventListener('click', e => { if (e.target === tcgModal) tcgModal.hidden = true; });
+
+      tcgCardList?.addEventListener('click', e => {
+        const prev = e.target.closest('.tcg-aa-prev-btn');
+        const next = e.target.closest('.tcg-aa-next-btn');
+        if (prev || next) {
+          e.stopPropagation();
+          cycleVariant(e.target.closest('.tcg-card-item'), prev ? -1 : 1);
+          return;
+        }
+        if (e.target.closest('.tcg-quantity-input') || e.target.closest('.tcg-card-checkbox')) return;
+        const item = e.target.closest('.tcg-card-item');
+        if (!item || item.classList.contains('disabled')) return;
+        const cb = item.querySelector('.tcg-card-checkbox');
+        if (cb && !cb.disabled) {
+          cb.checked = !cb.checked;
+          recalcTotal();
+        }
+      });
+      tcgCardList?.addEventListener('change', e => {
+        if (e.target.classList.contains('tcg-card-checkbox') ||
+            e.target.classList.contains('tcg-quantity-input')) recalcTotal();
+      });
+      tcgCardList?.addEventListener('input', e => {
+        if (e.target.classList.contains('tcg-quantity-input')) recalcTotal();
+      });
+
+      document.getElementById('toggleSelectAllBtn')?.addEventListener('click', () => {
+        const boxes = tcgCardList.querySelectorAll('.tcg-card-checkbox:not(:disabled)');
+        const anyChecked = Array.from(boxes).some(cb => cb.checked);
+        boxes.forEach(cb => cb.checked = !anyChecked);
+        recalcTotal();
+      });
+
+      buyOnTCGBtn?.addEventListener('click', () => {
+        const selected = [];
+        tcgCardList.querySelectorAll('.tcg-card-item').forEach(item => {
+          const cb = item.querySelector('.tcg-card-checkbox');
+          if (!cb || !cb.checked || cb.disabled) return;
+          const tpid = item.dataset.tcgId;
+          const qty = Math.max(1, Math.min(99, parseInt(item.querySelector('.tcg-quantity-input').value) || 1));
+          if (tpid) selected.push(qty + '-' + tpid);
+        });
+        if (!selected.length) return;
+        const massUrl = 'https://www.tcgplayer.com/massentry?c=' + encodeURIComponent(selected.join('||')) + '&productline=Star Wars Unlimited';
+        const affUrl = TCG_AFFILIATE_BASE + '?u=' + encodeURIComponent(massUrl) + '&subId1=swutcg-decklist';
+        window.open(affUrl, '_blank', 'noopener');
+      });
+
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && !tcgModal.hidden) tcgModal.hidden = true;
+      });
+    })();
+  </script>
+
+  <style is:global>
+    .decklists-page { max-width: 100%; margin: 0 auto; padding: 0 0 var(--space-2xl); }
+    .decklists-page header { margin-bottom: var(--space-lg); }
+    .decklists-page h1 { margin: 0 0 var(--space-sm); }
+    .decklists-page .page-intro { color: var(--color-text-secondary); line-height: 1.6; }
+    .meta-note { color: var(--color-text-tertiary); font-size: 0.9em; }
+
+    .empty-state { padding: var(--space-2xl); border: 1px solid var(--color-border); border-radius: var(--radius-lg); text-align: center; }
+    .empty-state h2 { margin: 0 0 var(--space-sm); }
+    .empty-state code { background: var(--color-bg-secondary); padding: 2px 8px; border-radius: 4px; }
+
+    .decklists-layout { display: flex; gap: var(--space-xl); align-items: flex-start; }
+    .decklists-table-section { flex: 2; min-width: 0; }
+    .decklists-meta { flex: 1; min-width: 0; position: sticky; top: var(--space-lg); }
+    @media (max-width: 1023px) {
+      .decklists-layout { flex-direction: column; }
+      .decklists-meta { flex: 1; width: 100%; }
+    }
+
+    /* Search bar â€” matches the database search-bar styling (underlined
+       input) so filters look consistent across the site. */
+    .decklists-search-row { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-md); }
+    .decklists-search { flex: 1; min-width: 0; padding: var(--space-sm) 0; background: transparent; color: var(--color-text-primary); border: none; border-bottom: 2px solid var(--color-border); border-radius: 0; font-size: var(--font-size-base); outline: none; transition: border-color var(--transition-fast); }
+    .decklists-search:focus { border-bottom-color: var(--color-accent-primary); }
+    .decklists-search::placeholder { color: var(--color-text-tertiary); }
+    .decklists-search-count { color: var(--color-text-tertiary); font-size: 0.85rem; white-space: nowrap; }
+
+    /* Table */
+    #decklistsTable { width: 100%; border-collapse: collapse; }
+    /* Deck cell â€” hero thumbnails (rarest Units, picked by pickHeroes)
+       sit alongside the deck name to give each row a visual identity. */
+    .deck-cell { display: flex; align-items: center; gap: var(--space-sm); }
+    .hero-stack { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+    .hero-thumb { width: 44px; height: auto; aspect-ratio: 5 / 7; border-radius: 4px; object-fit: cover; box-shadow: 0 1px 3px rgba(0,0,0,0.4); display: block; }
+    @media (max-width: 767px) {
+      .hero-stack { gap: 2px; }
+      .hero-thumb { width: 32px; }
+    }
+    #decklistsTable thead { text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.06em; color: var(--color-text-tertiary); }
+    #decklistsTable th { text-align: left; padding: var(--space-sm) var(--space-md); font-weight: 700; }
+    .deck-row { cursor: pointer; transition: background-color var(--transition-fast); }
+    .deck-row:hover { background: rgba(241, 196, 74, 0.06); }
+    .deck-row.expanded { background: rgba(241, 196, 74, 0.1); }
+    .deck-row td { padding: var(--space-sm) var(--space-md); vertical-align: middle; }
+
+    .leader-cell { display: flex; align-items: center; gap: var(--space-sm); }
+    .color-cell { display: flex; gap: 3px; flex-shrink: 0; }
+    .color-dot { display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--color-border-light); }
+    .color-dot-empty { background: transparent; border-style: dashed; }
+    .deck-name { font-weight: 700; color: var(--color-text-primary); }
+    .deck-set { font-size: 0.8rem; color: var(--color-text-tertiary); margin-top: 1px; font-family: monospace; }
+
+    /* Event cell â€” tournament name on top, author + host + country flag below */
+    .event-name { color: var(--color-text-primary); font-weight: 600; }
+    .event-meta { display: flex; gap: var(--space-sm); align-items: center; margin-top: 2px; font-size: 0.85rem; color: var(--color-text-tertiary); flex-wrap: wrap; }
+    .event-host { color: var(--color-text-tertiary); }
+    .country-flag { font-size: 0.7rem; padding: 1px 6px; background: var(--color-bg-secondary); color: var(--color-text-tertiary); border-radius: 3px; }
+
+    .col-date { color: var(--color-text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .col-result { color: var(--color-swu-yellow); font-weight: 700; white-space: nowrap; }
+
+    /* Expanded row â€” compact: groups wrap side-by-side, first one full-width */
+    .deck-row-expanded[hidden] { display: none; }
+    .deck-row-expanded td { padding: 0; }
+    .expanded-content { padding: var(--space-md); background: var(--color-bg-secondary); display: flex; flex-wrap: wrap; gap: var(--space-md); align-content: flex-start; }
+    .deck-type-group { flex: 1 1 240px; min-width: 0; margin: 0; }
+    .deck-type-group:first-of-type { flex: 0 0 100%; }
+    .deck-type-label { margin: 0 0 6px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-swu-yellow); }
+    .deck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: var(--space-sm); }
+    .deck-card-tile { position: relative; aspect-ratio: 5 / 7; border-radius: 6px; }
+    .deck-card-tile img { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; display: block; }
+    .deck-card-tile:hover { box-shadow: 0 0 0 2px var(--color-swu-yellow); }
+    .deck-card-tile .no-image { display: flex; align-items: center; justify-content: center; height: 100%; background: var(--color-bg-tertiary); border: 1px solid var(--color-border); border-radius: 6px; font-size: 11px; color: var(--color-text-tertiary); padding: 6px; text-align: center; }
+    .qty-badge { position: absolute; bottom: -4px; left: -4px; min-width: 22px; height: 22px; border-radius: 50%; background: var(--color-swu-yellow); color: var(--color-text-inverted); font-weight: 700; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; border: 2px solid var(--color-bg-secondary); }
+
+    .deck-actions { flex: 0 0 100%; display: flex; gap: var(--space-md); align-items: center; flex-wrap: wrap; padding-top: var(--space-sm); margin-top: var(--space-xs); border-top: 1px solid var(--color-border); }
+    .deck-action-btn { padding: 8px 16px; background: var(--color-bg-tertiary); color: var(--color-text-primary); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-weight: 700; cursor: pointer; transition: all 0.15s; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+    .deck-action-btn:hover { background: var(--color-bg-elevated); border-color: var(--color-swu-yellow); }
+    .deck-action-btn.copied { background: #28a745; color: #fff; border-color: #28a745; }
+    .deck-action-btn.buy-btn { background: var(--color-swu-yellow); color: var(--color-text-inverted); border-color: var(--color-swu-yellow); font-weight: 800; }
+    .deck-action-btn.buy-btn:hover { background: var(--color-swu-yellow-hi); border-color: var(--color-swu-yellow-hi); }
+    .deck-action-btn .buy-price { font-variant-numeric: tabular-nums; font-weight: 800; }
+    /* TCGplayer logo, masked + recolored to match button text â€” same
+       trick as the builder's .buy-cart-icon. */
+    .buy-cart-icon { display: inline-block; width: 18px; height: 14px; flex-shrink: 0; background-color: var(--color-text-inverted); -webkit-mask: url('/tcgplayer-logo.webp') center / contain no-repeat; mask: url('/tcgplayer-logo.webp') center / contain no-repeat; }
+
+    /* Cursor-following hover preview (desktop) */
+    #cardHoverPreview {
+      display: none;
+      position: fixed;
+      width: 320px;
+      z-index: 1001;
+      pointer-events: none;
+    }
+    #cardHoverPreview img { width: 100%; border-radius: 12px; box-shadow: 0 12px 36px rgba(0,0,0,0.5); display: block; }
+    /* Tap-to-view full image overlay on touch devices: centered on screen,
+       darkens behind, tap anywhere to dismiss. */
+    #cardHoverPreview.preview-centered {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(90vw, 360px);
+      pointer-events: auto;
+      z-index: 1100;
+    }
+
+    /* TCGplayer Buy modal â€” same look as /builder's modal */
+    .modal { display: none; position: fixed; inset: 0; z-index: 1000; background: var(--color-overlay); }
+    .modal:not([hidden]) { display: block; }
+    .modal-content { background: var(--color-bg-elevated); margin: 2% auto; padding: var(--space-xl); border-radius: 15px; max-height: 90vh; }
+    .tcg-modal-content { max-width: 1200px; width: 95%; display: flex; flex-direction: column; gap: 0; position: relative; }
+    .tcg-modal-content .modal-close { position: absolute; top: var(--space-sm); right: var(--space-md); background: none; border: none; font-size: 32px; line-height: 1; color: var(--color-text-tertiary); cursor: pointer; padding: 0; transition: color 0.15s; }
+    .tcg-modal-content .modal-close:hover { color: var(--color-text-primary); }
+    .tcg-modal-content .modal-body { flex: 1; overflow-y: auto; padding-top: var(--space-md); }
+    .tcg-card-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--space-md); }
+    .tcg-card-item { display: flex; flex-direction: column; align-items: center; padding: var(--space-sm); background: var(--color-bg-tertiary); border-radius: var(--radius-lg); transition: all 0.2s; position: relative; border: 2px solid transparent; cursor: pointer; user-select: none; }
+    .tcg-card-item:hover:not(.disabled) { background: var(--color-bg-secondary); }
+    .tcg-card-item.selected { border-color: var(--color-swu-yellow); background: var(--color-bg-secondary); }
+    .tcg-card-item.disabled { opacity: 0.55; cursor: not-allowed; }
+    .tcg-card-checkbox { display: none; }
+    .tcg-card-img-wrapper { position: relative; width: 100%; margin-bottom: var(--space-sm); }
+    .tcg-card-img { width: 100%; height: auto; aspect-ratio: 5/7; object-fit: cover; border-radius: var(--radius-md); display: block; }
+    .tcg-aa-prev-btn, .tcg-aa-next-btn { position: absolute; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; padding: 0; border: none; border-radius: 50%; background: rgba(0,0,0,0.7); color: var(--color-swu-yellow); cursor: pointer; z-index: 2; display: flex; align-items: center; justify-content: center; font-size: 12px; transition: background 0.15s; }
+    .tcg-aa-prev-btn:hover, .tcg-aa-next-btn:hover { background: var(--color-swu-yellow); color: var(--color-text-inverted); }
+    .tcg-aa-badge-left { left: -6px; }
+    .tcg-aa-badge-right { right: -6px; }
+    .tcg-card-info { width: 100%; text-align: center; }
+    .tcg-card-name { font-size: 0.85rem; color: var(--color-text-primary); margin-bottom: var(--space-xs); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; min-height: 2.5em; }
+    .tcg-card-quantity { font-size: 0.85rem; color: var(--color-text-secondary); display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .tcg-quantity-input { width: 50px; padding: 3px 6px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-bg-primary); color: var(--color-text-primary); font: inherit; font-size: 0.85rem; text-align: center; -moz-appearance: textfield; }
+    .tcg-quantity-input::-webkit-outer-spin-button, .tcg-quantity-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .tcg-card-price { font-weight: 700; color: var(--color-text-primary); }
+    .tcg-modal-content .modal-footer { display: flex; justify-content: space-between; align-items: center; padding-top: var(--space-md); margin-top: var(--space-md); border-top: 1px solid var(--color-border); flex-shrink: 0; gap: var(--space-md); }
+    .footer-left, .footer-right { display: flex; align-items: center; gap: var(--space-sm); }
+    .select-btn { background: var(--color-bg-tertiary); color: var(--color-text-secondary); border: 1px solid var(--color-border); padding: 6px 12px; border-radius: var(--radius-md); cursor: pointer; font: inherit; font-size: 0.85rem; transition: all 0.15s; }
+    .select-btn:hover { background: var(--color-bg-secondary); color: var(--color-text-primary); border-color: var(--color-swu-yellow); }
+    .total-price { font-size: 1rem; color: var(--color-text-secondary); }
+    .total-price span { color: var(--color-swu-yellow); font-weight: 700; }
+    .tcg-buy-btn { background: var(--color-swu-yellow); color: var(--color-text-inverted); border: none; padding: 8px 16px; border-radius: var(--radius-md); font: inherit; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+    .tcg-buy-btn:hover:not(:disabled) { background: var(--color-swu-yellow-hi); }
+    .tcg-buy-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    @media (max-width: 768px) {
+      .tcg-card-list { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: var(--space-sm); }
+      .tcg-modal-content .modal-footer { flex-direction: column; align-items: stretch; }
+    }
+    .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
+
+    /* Meta snapshot â€” minimal text-forward block, lorcana pattern */
+    .decklists-meta { padding: 0 var(--space-sm); position: sticky; top: var(--space-md); }
+    .decklists-meta h2 { margin: 0 0 var(--space-sm); padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-border-light); font-size: 16px; font-weight: 700; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.08em; }
+    .meta-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; }
+    .meta-row { display: grid; grid-template-columns: minmax(140px, auto) 1fr auto; gap: 12px; align-items: center; padding: 8px 0; font-size: 17px; }
+    .meta-label { color: var(--color-text-primary); font-weight: 600; }
+    .meta-bar { display: block; height: 10px; min-width: 0; background: transparent; border-radius: 0; overflow: visible; }
+    .meta-bar-fill { display: block; height: 100%; border-radius: 5px; }
+    .meta-count { font-weight: 700; color: var(--color-swu-yellow); font-variant-numeric: tabular-nums; }
+    .meta-snapshot-prose { margin: var(--space-md) 0 0; padding-top: var(--space-md); border-top: 1px solid var(--color-border-light); font-size: 0.95rem; line-height: 1.55; color: var(--color-text-secondary); }
+    .meta-snapshot-prose strong { color: var(--color-text-primary); }
+    .meta-source { margin: var(--space-sm) 0 0; font-size: 0.85rem; color: var(--color-text-tertiary); }
+    .meta-source a { color: var(--color-accent-primary); text-decoration: none; }
+    .meta-source a:hover { text-decoration: underline; }
+
+    @media (max-width: 767px) {
+      .decklists-meta { position: static; }
+      /* Mobile table: contained within the page width with cells that
+         break long unspaced strings (e.g. "1stPlace/Tournament" with no
+         spaces) so the table can't overflow horizontally. */
+      .decklists-table-section { width: 100%; max-width: 100%; overflow: hidden; }
+      #decklistsTable { font-size: 0.8rem; table-layout: auto; width: 100%; max-width: 100%; }
+      #decklistsTable th, #decklistsTable td { padding: 6px 4px; white-space: normal; }
+      .col-date, .col-result { white-space: nowrap; }
+      .col-event { overflow-wrap: anywhere; word-break: break-word; }
+      /* Expanded deck view: same compact card sizing as builder's deck
+         panel â€” smaller tiles, tighter padding, type groups share rows. */
+      .expanded-content { padding: var(--space-sm); gap: var(--space-sm); }
+      .deck-type-group { flex: 1 1 160px; }
+      .deck-grid { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; }
+      .qty-badge { min-width: 20px; height: 20px; font-size: 0.72rem; border-width: 2px; }
+    }
+  </style>
+</Layout>

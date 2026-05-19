@@ -1,0 +1,103 @@
+/* Tailwind CSS - can be removed if not using utility classes */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base Styles */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--color-bg-primary);
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--font-family-primary);
+  margin: 0;
+  padding: 0 var(--container-padding) var(--container-padding) var(--container-padding);
+  background: transparent;
+  color: var(--color-text-primary);
+  -webkit-tap-highlight-color: transparent;
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+/* Accessibility - Visually hidden but available to screen readers and SEO */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* h1 size + family handled in tokens.css. Below is just for the rare
+   case where an h1 wraps a logo image (header logo replacement). */
+h1 img {
+  height: auto;
+  width: auto;
+  max-width: 100%;
+  max-height: var(--header-height);
+  display: block;
+  margin: 0 auto;
+  filter: invert(1);  /* dark-mode only → always invert */
+}
+
+/* Status and Error Messages */
+.status {
+  text-align: center;
+  padding: var(--space-lg);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-base);
+}
+
+.error {
+  background: var(--color-error-bg);
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  margin: var(--space-lg) 0;
+  text-align: center;
+}
+
+/* Database Stats */
+.database-stats {
+  background: var(--color-bg-elevated);
+  padding: var(--space-lg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-lg);
+  text-align: center;
+}
+
+.database-stats p {
+  margin: var(--space-xs) 0;
+  color: var(--color-text-secondary);
+}
+
+/* Mobile-specific styles */
+@media (max-width: 767px) {
+  body {
+    padding: 0 10px 70px 10px; /* Consistent mobile padding with fixed nav space */
+  }
+}
+
+/* Print styles */
+@media print {
+  .main-nav,
+  .controls,
+  .icon-toggle {
+    display: none;
+  }
+}

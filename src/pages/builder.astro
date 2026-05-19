@@ -1,0 +1,1253 @@
+﻿---
+export const prerender = true;
+
+import Layout from '../layouts/Layout.astro';
+import Navigation from '../components/Navigation.astro';
+import SearchFilters from '../components/SearchFilters.astro';
+import { loadCardData } from '../utils/loadCardData.js';
+
+interface Card {
+  id: string; slug?: string; name?: string;
+  type?: string; color?: string; rarity?: string;
+  cost?: number | null; level?: number | null;
+  ap?: number | null; hp?: number | null;
+  zone?: string; trait?: string; link?: string;
+  description?: string; action?: string;
+  source_title?: string;
+  tcgPlayerId?: string | null; price?: number | null;
+}
+
+const { cards } = await loadCardData() as { cards: Card[] };
+
+// Strip C0 control chars (0x00-0x1F minus space; we keep none). TCGCSV
+// strings sometimes contain CR, vertical tab, etc. that JSON.parse rejects
+// when set:html inlines the JSON into the page.
+function clean(s: any): string {
+  if (s == null) return '';
+  // Strip C0 control chars (U+0000-U+001F) + DEL (U+007F), then collapse
+  // whitespace runs. RegExp built from String.fromCharCode to keep this
+  // source file free of literal control bytes (Astro's parser rejects them).
+  const ctrl = new RegExp('[' + String.fromCharCode(0) + '-' + String.fromCharCode(31) + String.fromCharCode(127) + ']+', 'g');
+  const ws = new RegExp('\\s+', 'g');
+  return String(s).replace(ctrl, ' ').replace(ws, ' ').trim();
+}
+
+// Compact card payload â€” strip fields the builder doesn't need so the
+// inline JSON stays under ~200KB. Keep enough for filter, render, and
+// validation.
+const compact = cards.map(c => ({
+  id: clean(c.id),
+  slug: clean(c.slug),
+  name: clean(c.name),
+  type: clean(c.type),
+  color: clean(c.color),
+  cost: c.cost,
+  level: c.level,
+  ap: c.ap,
+  hp: c.hp,
+  rarity: clean(c.rarity),
+  trait: clean(c.trait),
+  description: clean(c.description),
+  source_title: clean(c.source_title),
+  isAA: c.id?.includes('_') ? 1 : 0,
+  baseId: c.id?.split('_')[0],
+  tcgPlayerId: c.tcgPlayerId || null,
+  price: c.price ?? null,
+}));
+
+// Tournament decks for ?deck=N URL-param import are now lazy-fetched
+// from /data/tournament-decks.json at runtime (only when a ?deck= param
+// is present). Inlining the payload made every builder.html visit pay
+// 100-150KB for a feature most users never trigger.
+
+const totalCards = cards.length;
+const description = `Star Wars Unlimited deck builder. Build a 50-card main deck plus 10-card resource deck with ${totalCards.toLocaleString()} cards. Import/export, color and copy limits enforced.`;
+---
+
+<Layout
+  title="Star Wars Unlimited Deck Builder - Build Card Game Decks Online"
+  description={description}
+  canonical="https://www.swutcg.one/builder"
+  pageId="builder"
+>
+  <script is:inline type="application/json" id="builder-cards-data" set:html={JSON.stringify(compact)}></script>
+
+  <script is:inline type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Star Wars Unlimited Deck Builder",
+    "description": description,
+    "url": "https://www.swutcg.one/builder",
+    "applicationCategory": "GameApplication",
+    "operatingSystem": "Any",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "featureList": [
+      "Full card pool with live filtering",
+      "Real-time deck validation (50-card main + 10-card resource)",
+      "Color and copy-limit enforcement",
+      "Import / export decklists",
+      "URL-shareable decks"
+    ]
+  })} />
+
+  <header>
+    <Navigation activePage="builder" />
+    <h1>Star Wars Unlimited Deck Builder</h1>
+    <p class="page-intro">
+      <strong>Star Wars Unlimited deck builder</strong> for the 50-card main + 10-card resource format. <a href="/database">{totalCards.toLocaleString()} cards</a> in the pool. Copy <a href="/decklists">tournament decklists</a> or read <a href="/how-to-play">the rules</a> first.
+    </p>
+  </header>
+
+  <main class="builder-page">
+    <div class="builder-layout" data-mobile-tab="cards">
+      <!-- LEFT: deck area -->
+      <section class="deck-area" aria-labelledby="deck-area-heading">
+        <h2 id="deck-area-heading" class="sr-only">Your deck</h2>
+
+        <div class="deck-controls">
+          <h3 class="deck-main-title">Main deck <span class="deck-count" id="mainCount">0/50</span></h3>
+          <div class="deck-controls-buttons">
+            <button class="deck-btn" id="importBtn" type="button">Import</button>
+            <button class="deck-btn" id="exportBtn" type="button">Export</button>
+            <button class="deck-btn deck-btn-buy" id="buyDeckBtn" type="button" disabled>
+              <span class="buy-price">$0.00</span>
+              <span class="buy-cart-icon" aria-hidden="true"></span>
+            </button>
+            <button class="deck-btn deck-btn-danger" id="clearBtn" type="button">Clear</button>
+          </div>
+        </div>
+
+        <div class="deck-section" id="mainDeckSection">
+          <div id="mainDeckGrid" class="deck-grid"></div>
+        </div>
+
+        <div class="deck-section" id="resourceDeckSection">
+          <span class="deck-count sr-only" id="resourceCount">0/10</span>
+          <div id="resourceDeckGrid" class="deck-grid"></div>
+        </div>
+      </section>
+
+      <!-- RIGHT: card pool -->
+      <section class="pool-area" aria-labelledby="pool-heading">
+        <h2 id="pool-heading" class="sr-only">Card pool</h2>
+        <SearchFilters />
+        <div id="poolGrid" class="cards-grid pool-grid" role="list" aria-live="polite"></div>
+        <div id="poolEmpty" class="empty-state-inline" hidden>No cards match your filters.</div>
+        <div id="poolMore" class="pool-more">
+          <button type="button" id="loadMoreBtn" class="deck-btn">Load more</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- Mobile tab switch -->
+    <div class="mobile-tab-switch" role="tablist">
+      <button type="button" class="mobile-tab active" data-tab="cards" role="tab">Cards</button>
+      <button type="button" class="mobile-tab" data-tab="deck" role="tab">
+        Deck <span class="mobile-tab-count" id="mobileTabCount">0/50</span>
+      </button>
+    </div>
+  </main>
+
+  <!-- Cursor-following preview for the card pool (desktop only) -->
+  <div id="cardHoverPreview" aria-hidden="true"></div>
+
+  <!-- TCGPlayer Buy modal (mirrors optcg's pattern with alt-art cycling) -->
+  <div id="tcgPlayerModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="tcgModalTitle">
+    <div class="modal-content tcg-modal-content">
+      <button type="button" class="modal-close" id="tcgClose" aria-label="Close">&times;</button>
+      <h2 id="tcgModalTitle" class="sr-only">Buy deck on TCGplayer</h2>
+      <div class="modal-body">
+        <div class="tcg-card-list" id="tcgCardList"></div>
+      </div>
+      <div class="modal-footer">
+        <div class="footer-left">
+          <button type="button" id="toggleSelectAllBtn" class="select-btn">Unselect All</button>
+        </div>
+        <div class="footer-right">
+          <div class="total-price">Total: <span id="totalPrice">$0.00</span></div>
+          <button type="button" id="buyOnTCGPlayer" class="tcg-buy-btn" disabled>Buy on TCGplayer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import/Export modal -->
+  <div id="ioModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="ioTitle">
+    <div class="modal-content modal-content-narrow">
+      <button type="button" class="modal-close" id="ioClose" aria-label="Close">&times;</button>
+      <h2 id="ioTitle">Import / Export</h2>
+      <p class="io-help">One card per line as <code>QTY ID</code> (e.g. <code>4 ST01-005</code>). Resource deck after a blank line.</p>
+      <textarea id="ioTextarea" class="io-textarea" rows="20" spellcheck="false"></textarea>
+      <div class="io-actions">
+        <button type="button" class="deck-btn" id="ioCopyBtn">Copy</button>
+        <button type="button" class="deck-btn deck-btn-primary" id="ioApplyBtn">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <script is:inline>
+    (function() {
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // CONFIG (matches the comprehensive rules v1.6.0 Â§6-1)
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      const CONFIG = {
+        MAIN_SIZE: 50,
+        RESOURCE_SIZE: 10,
+        MAX_COPIES: 4,
+        MAX_COLORS: 2,
+        POOL_PAGE: 60,    // cards per page in the pool grid
+      };
+
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // STATE
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      const allCards = JSON.parse(document.getElementById('builder-cards-data').textContent || '[]');
+      const cardById = new Map(allCards.map(c => [c.id, c]));
+
+      // Deck state â€” Map<cardId, qty>
+      const main = new Map();
+      const resource = new Map();
+      let deckName = '';
+
+      // Filter state
+      const filters = {
+        search: '',
+        inks: new Set(),
+        types: new Set(),
+        costs: new Set(),
+        abilities: new Set(),
+        aaMode: 'all',  // 'all' | 'aa-only' | 'regular-only'
+      };
+
+      let renderedCount = 0;
+
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ELEMENT REFS
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      const $ = (sel) => document.querySelector(sel);
+      const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+      const els = {
+        searchBar: $('#searchBar'),
+        toggleAABtn: $('#toggleAABtn'),
+        filterToggleBtn: $('#filterToggleBtn'),
+        filtersRow: $('#filtersRow'),
+        clearFiltersBtn: $('#clearFiltersBtn'),
+        poolGrid: $('#poolGrid'),
+        poolEmpty: $('#poolEmpty'),
+        poolMore: $('#poolMore'),
+        loadMoreBtn: $('#loadMoreBtn'),
+        mainGrid: $('#mainDeckGrid'),
+        resourceGrid: $('#resourceDeckGrid'),
+        mainCount: $('#mainCount'),
+        resourceCount: $('#resourceCount'),
+        importBtn: $('#importBtn'),
+        exportBtn: $('#exportBtn'),
+        clearBtn: $('#clearBtn'),
+        ioModal: $('#ioModal'),
+        ioClose: $('#ioClose'),
+        ioTextarea: $('#ioTextarea'),
+        ioCopyBtn: $('#ioCopyBtn'),
+        ioApplyBtn: $('#ioApplyBtn'),
+        mobileTabs: $$('.mobile-tab'),
+        mobileTabCount: $('#mobileTabCount'),
+        builderLayout: $('.builder-layout'),
+        // TCGplayer modal + Buy button
+        buyDeckBtn: $('#buyDeckBtn'),
+        buyPriceLabel: $('.buy-price'),
+        tcgModal: $('#tcgPlayerModal'),
+        tcgClose: $('#tcgClose'),
+        tcgCardList: $('#tcgCardList'),
+        totalPriceLabel: $('#totalPrice'),
+        buyOnTCGBtn: $('#buyOnTCGPlayer'),
+        toggleSelectAllBtn: $('#toggleSelectAllBtn'),
+        // Hover preview
+        hoverPreview: $('#cardHoverPreview'),
+      };
+
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // FILTERING
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      function passesFilters(card) {
+        if (filters.aaMode === 'aa-only' && !card.isAA) return false;
+        if (filters.aaMode === 'regular-only' && card.isAA) return false;
+        if (filters.search) {
+          const q = filters.search;
+          const haystack = [
+            card.name,
+            card.id,
+            card.trait,
+            card.source_title,
+            card.description
+          ].map(v => (v || '').toLowerCase()).join('   ');
+          if (!haystack.includes(q)) return false;
+        }
+        if (filters.inks.size && !filters.inks.has((card.color || '').toLowerCase())) return false;
+        if (filters.types.size && !filters.types.has(card.type)) return false;
+        if (filters.costs.size) {
+          const c = card.cost == null ? '' : String(card.cost);
+          if (filters.costs.has('10')) {
+            if (!(filters.costs.has(c) || (c !== '' && Number(c) >= 10))) return false;
+          } else if (!filters.costs.has(c)) return false;
+        }
+        return true;
+      }
+
+      function getFilteredPool() {
+        return allCards.filter(passesFilters);
+      }
+
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // POOL RENDERING (paginated for perf)
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      function imgSrcSet(id) {
+        return {
+          src: `/cards/${id}-160w.webp`,
+          srcset: `/cards/${id}-160w.webp 160w, /cards/${id}-640w.webp 640w, /cards/${id}.webp 1600w`,
+        };
+      }
+
+      function poolTileHTML(card) {
+        const ss = imgSrcSet(card.id);
+        const inDeckQty = (main.get(card.id) || 0) + (resource.get(card.id) || 0);
+        return `
+          <div class="pool-tile ${inDeckQty > 0 ? 'in-deck' : ''}" data-card-id="${card.id}" role="listitem" title="${escapeAttr(card.name || card.id)} (${card.id})">
+            <img src="${ss.src}" srcset="${ss.srcset}" sizes="100px" width="160" height="224" alt="${escapeAttr(card.name || card.id)}" loading="lazy" decoding="async" />
+            ${inDeckQty > 0 ? `<span class="pool-qty-badge">${inDeckQty}</span>` : ''}
+          </div>
+        `;
+      }
+
+      function escapeAttr(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+      }
+
+      function renderPool(reset = false) {
+        const pool = getFilteredPool();
+        if (reset) {
+          renderedCount = 0;
+          els.poolGrid.innerHTML = '';
+        }
+        if (pool.length === 0) {
+          els.poolEmpty.hidden = false;
+          els.poolMore.style.display = 'none';
+          return;
+        }
+        els.poolEmpty.hidden = true;
+        const slice = pool.slice(renderedCount, renderedCount + CONFIG.POOL_PAGE);
+        els.poolGrid.insertAdjacentHTML('beforeend', slice.map(poolTileHTML).join(''));
+        renderedCount += slice.length;
+        els.poolMore.style.display = renderedCount < pool.length ? 'flex' : 'none';
+      }
+
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // DECK ACTIONS
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      function isResource(card) { return card.type === 'Resource'; }
+
+      function totalCount(map) {
+        let sum = 0;
+        for (const q of map.values()) sum += q;
+        return sum;
+      }
+
+      // 4-copy limit applies across all printings of the same card number,
+      // i.e. group by baseId not card.id.
+      function copiesByBaseId(map) {
+        const out = new Map();
+        for (const [id, qty] of map.entries()) {
+          const card = cardById.get(id);
+          const key = card ? card.baseId : id;
+          out.set(key, (out.get(key) || 0) + qty);
+        }
+        return out;
+      }
+
+      function deckColors() {
+        const set = new Set();
+        for (const id of main.keys()) {
+          const c = cardById.get(id);
+          if (c?.color && c.color !== '-') set.add(c.color);
+        }
+        return Array.from(set);
+      }
+
+      // Brief red shake on a pool tile when an add is rejected â€” replaces
+      // the validation banner with inline visual feedback.
+      function shakeTile(cardId) {
+        const tile = els.poolGrid.querySelector(`.pool-tile[data-card-id="${CSS.escape(cardId)}"]`);
+        if (!tile) return;
+        tile.classList.remove('shake');
+        // Force reflow so the animation re-fires on rapid repeats
+        void tile.offsetWidth;
+        tile.classList.add('shake');
+        setTimeout(() => tile.classList.remove('shake'), 380);
+      }
+
+      // Pool-side cycle: 0 â†’ 1 â†’ 2 â†’ 3 â†’ 4 â†’ 0 (matches optcg).
+      // Resource cards have no copy limit; cycling caps at 4 too â€” change
+      // here if Fantasy Flight Games ever publishes a Resource-deck-specific cap.
+      function tryAdd(cardId) {
+        const card = cardById.get(cardId);
+        if (!card) return;
+        const target = isResource(card) ? resource : main;
+        const sizeLimit = isResource(card) ? CONFIG.RESOURCE_SIZE : CONFIG.MAIN_SIZE;
+        const cur = target.get(cardId) || 0;
+
+        if (cur >= CONFIG.MAX_COPIES) {
+          // Already at max â€” cycle back to 0 (full remove).
+          target.delete(cardId);
+          renderDeck(); updateCounts(); updateInlineQty(cardId); persistToHash();
+          return;
+        }
+
+        // Increment by 1, but check size + base-id copy caps first.
+        if (totalCount(target) >= sizeLimit) { shakeTile(cardId); return; }
+        if (!isResource(card)) {
+          const baseCounts = copiesByBaseId(main);
+          if ((baseCounts.get(card.baseId) || 0) >= CONFIG.MAX_COPIES) {
+            shakeTile(cardId);
+            return;
+          }
+        }
+        target.set(cardId, cur + 1);
+        renderDeck(); updateCounts(); updateInlineQty(cardId); persistToHash();
+      }
+
+      // Deck-side click cycle: 1 â†’ 2 â†’ 3 â†’ 4 â†’ 1 (never goes to 0).
+      // The Ã— badge is the only path back to 0.
+      function deckCycleQty(cardId) {
+        const card = cardById.get(cardId);
+        if (!card) return;
+        const target = isResource(card) ? resource : main;
+        const cur = target.get(cardId) || 0;
+        if (cur === 0) return;
+
+        if (cur >= CONFIG.MAX_COPIES) {
+          target.set(cardId, 1);
+        } else {
+          // Bumping +1 â€” re-check size + base copy caps.
+          const sizeLimit = isResource(card) ? CONFIG.RESOURCE_SIZE : CONFIG.MAIN_SIZE;
+          if (totalCount(target) >= sizeLimit) { return; }
+          if (!isResource(card)) {
+            const baseCounts = copiesByBaseId(main);
+            if ((baseCounts.get(card.baseId) || 0) >= CONFIG.MAX_COPIES) return;
+          }
+          target.set(cardId, cur + 1);
+        }
+        renderDeck(); updateCounts(); updateInlineQty(cardId); persistToHash();
+      }
+
+      // Ã— badge â€” completely removes a card from the deck regardless of qty.
+      function tryRemove(cardId) {
+        const card = cardById.get(cardId);
+        if (!card) return;
+        const target = isResource(card) ? resource : main;
+        const cur = target.get(cardId) || 0;
+        if (cur === 0) return;
+        target.delete(cardId);
+        renderDeck();
+        updateCounts();
+        validate();
+        updateInlineQty(cardId);
+        persistToHash();
+      }
+
+      function updateInlineQty(cardId) {
+        const tile = els.poolGrid.querySelector(`.pool-tile[data-card-id="${CSS.escape(cardId)}"]`);
+        if (!tile) return;
+        const qty = (main.get(cardId) || 0) + (resource.get(cardId) || 0);
+        const badge = tile.querySelector('.pool-qty-badge');
+        if (qty > 0) {
+          tile.classList.add('in-deck');
+          if (badge) badge.textContent = String(qty);
+          else tile.insertAdjacentHTML('beforeend', `<span class="pool-qty-badge">${qty}</span>`);
+        } else {
+          tile.classList.remove('in-deck');
+          if (badge) badge.remove();
+        }
+      }
+
+      function clearDeck() {
+        main.clear();
+        resource.clear();
+        renderDeck();
+        renderPool(true);
+        updateCounts();
+        validate();
+        persistToHash();
+      }
+
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // DECK RENDERING (group by type, sort by cost asc)
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      const TYPE_ORDER = ['Unit', 'Pilot', 'Command', 'Base'];
+
+      function deckTileHTML(card, qty) {
+        const ss = imgSrcSet(card.id);
+        return `
+          <div class="deck-tile" data-card-id="${card.id}" title="Click to cycle quantity Â· Ã— to remove">
+            <img src="${ss.src}" srcset="${ss.srcset}" sizes="80px" width="160" height="224" alt="${escapeAttr(card.name || card.id)}" loading="lazy" decoding="async" />
+            <button type="button" class="deck-tile-remove" aria-label="Remove ${escapeAttr(card.name || card.id)} from deck">&times;</button>
+            <span class="deck-tile-qty">${qty}</span>
+          </div>
+        `;
+      }
+
+      function renderDeck() {
+        // Main: bucket by type, then sort each by cost asc â†’ name asc
+        const buckets = new Map(TYPE_ORDER.map(t => [t, []]));
+        for (const [id, qty] of main.entries()) {
+          const c = cardById.get(id);
+          if (!c) continue;
+          const bucket = buckets.get(c.type) || (buckets.set(c.type, []), buckets.get(c.type));
+          bucket.push({ card: c, qty });
+        }
+        const sortFn = (a, b) => (a.card.cost ?? 99) - (b.card.cost ?? 99) || (a.card.name || '').localeCompare(b.card.name || '');
+        let mainHTML = '';
+        for (const t of TYPE_ORDER) {
+          const arr = buckets.get(t) || [];
+          if (!arr.length) continue;
+          arr.sort(sortFn);
+          const total = arr.reduce((s, x) => s + x.qty, 0);
+          mainHTML += `<div class="deck-type-group"><h4 class="deck-type-label">${t}s (${total})</h4><div class="deck-tile-row">${arr.map(x => deckTileHTML(x.card, x.qty)).join('')}</div></div>`;
+        }
+        els.mainGrid.innerHTML = mainHTML || '<p class="deck-empty">Click any card to add it to your deck</p>';
+
+        // Resource grid
+        const resArr = [];
+        for (const [id, qty] of resource.entries()) {
+          const c = cardById.get(id);
+          if (c) resArr.push({ card: c, qty });
+        }
+        resArr.sort(sortFn);
+        els.resourceGrid.innerHTML = resArr.length
+          ? `<div class="deck-tile-row">${resArr.map(x => deckTileHTML(x.card, x.qty)).join('')}</div>`
+          : '';
+
+        // Keep the Buy button + price in sync with deck contents
+        if (typeof refreshBuyButton === 'function') refreshBuyButton();
+      }
+
+      function updateCounts() {
+        const m = totalCount(main);
+        const r = totalCount(resource);
+        els.mainCount.textContent = `${m}/${CONFIG.MAIN_SIZE}`;
+        els.resourceCount.textContent = `${r}/${CONFIG.RESOURCE_SIZE}`;
+        els.mobileTabCount.textContent = `${m}/${CONFIG.MAIN_SIZE}`;
+        els.mainCount.classList.toggle('count-ok', m === CONFIG.MAIN_SIZE);
+        els.mainCount.classList.toggle('count-over', m > CONFIG.MAIN_SIZE);
+        els.resourceCount.classList.toggle('count-ok', r === CONFIG.RESOURCE_SIZE);
+        els.resourceCount.classList.toggle('count-over', r > CONFIG.RESOURCE_SIZE);
+      }
+
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // VALIDATION (live badge)
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // Validation rules still ENFORCED (50/10 size, max 4 copies, max 2
+      // colors) but no UI banner is rendered. The deck-count chips going
+      // green/red still signal main/resource size at a glance.
+      function validate() { /* no-op â€” counts on chips are the only indicator */ }
+      function flashValidation(_msg) { /* no-op */ }
+
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // IMPORT / EXPORT (text format: `QTY ID` per line, blank line separates main/resource)
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      function exportText() {
+        const lines = [];
+        if (deckName) lines.push(`# ${deckName}`);
+        const dump = (map) => {
+          const rows = [];
+          for (const [id, qty] of map.entries()) rows.push({ id, qty });
+          rows.sort((a, b) => a.id.localeCompare(b.id));
+          return rows.map(r => `${r.qty} ${r.id}`);
+        };
+        lines.push(...dump(main));
+        lines.push('');
+        lines.push(...dump(resource));
+        return lines.join('\n').trim() + '\n';
+      }
+
+      function importText(text) {
+        main.clear();
+        resource.clear();
+        const lines = text.split(/\r?\n/);
+        let inResource = false;
+        let cardLinesSeen = 0;
+        for (const raw of lines) {
+          const line = raw.trim();
+          if (!line) {
+            if (cardLinesSeen > 0) inResource = true;
+            continue;
+          }
+          if (line.startsWith('#')) {
+            // Deck-name comment in import â€” kept on the variable for export
+            // round-trip but no UI input to surface it any more.
+            deckName = line.slice(1).trim();
+            continue;
+          }
+          const m = line.match(/^(\d+)\s+(\S+)/);
+          if (!m) { continue; }
+          const qty = parseInt(m[1], 10);
+          const id = m[2];
+          const card = cardById.get(id);
+          if (!card) continue;
+          const target = isResource(card) || inResource ? resource : main;
+          target.set(id, (target.get(id) || 0) + qty);
+          cardLinesSeen++;
+        }
+        renderDeck();
+        renderPool(true);
+        updateCounts();
+        validate();
+        persistToHash();
+      }
+
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // URL HASH PERSISTENCE  #d=4xST01-005,3xGD01-008,...|2xRES-001,8xRES-002
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      function persistToHash() {
+        const enc = (map) => Array.from(map.entries()).map(([id, q]) => `${q}x${id}`).join(',');
+        const hash = `d=${enc(main)}|${enc(resource)}`;
+        history.replaceState(null, '', '#' + hash);
+        try { localStorage.setItem('swuBuilderDeck', hash); } catch {}
+      }
+
+      function loadFromHash() {
+        let hash = (location.hash || '').replace(/^#/, '');
+        if (!hash || !hash.startsWith('d=')) {
+          try { hash = localStorage.getItem('swuBuilderDeck') || ''; } catch {}
+        }
+        if (!hash.startsWith('d=')) return;
+        const body = hash.slice(2);
+        const [mainStr, resStr] = body.split('|');
+        const apply = (s, target) => {
+          if (!s) return;
+          for (const part of s.split(',')) {
+            const m = part.match(/^(\d+)x(.+)$/);
+            if (!m) continue;
+            const qty = parseInt(m[1], 10);
+            const id = m[2];
+            if (cardById.has(id)) target.set(id, qty);
+          }
+        };
+        apply(mainStr, main);
+        apply(resStr, resource);
+      }
+
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // EVENT BINDINGS
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // Search
+      let searchT;
+      els.searchBar?.addEventListener('input', () => {
+        clearTimeout(searchT);
+        searchT = setTimeout(() => {
+          filters.search = els.searchBar.value.trim().toLowerCase();
+          renderPool(true);
+        }, 120);
+      });
+
+      // Chip groups (color/type/cost/ability)
+      function bindChipGroup(groupCls, dsKey, stateKey) {
+        $$('.' + groupCls + ' .filter-chip').forEach(chip => {
+          chip.addEventListener('click', () => {
+            const v = chip.dataset[dsKey];
+            if (filters[stateKey].has(v)) {
+              filters[stateKey].delete(v);
+              chip.classList.remove('active');
+              chip.setAttribute('aria-pressed', 'false');
+            } else {
+              filters[stateKey].add(v);
+              chip.classList.add('active');
+              chip.setAttribute('aria-pressed', 'true');
+            }
+            renderPool(true);
+          });
+        });
+      }
+      bindChipGroup('color-filter', 'ink', 'inks');
+      bindChipGroup('type-filter', 'type', 'types');
+      bindChipGroup('cost-filter', 'cost', 'costs');
+      bindChipGroup('ability-filter', 'ability', 'abilities');
+
+      // AA toggle (3-state cycle, mirrors database page)
+      els.toggleAABtn?.addEventListener('click', () => {
+        const next = { 'all': 'aa-only', 'aa-only': 'regular-only', 'regular-only': 'all' };
+        filters.aaMode = next[filters.aaMode];
+        els.toggleAABtn.classList.remove('active', 'inverse');
+        if (filters.aaMode === 'aa-only') els.toggleAABtn.classList.add('active');
+        else if (filters.aaMode === 'regular-only') els.toggleAABtn.classList.add('inverse');
+        renderPool(true);
+      });
+
+      // Filter toggle (show/hide chip rows)
+      els.filterToggleBtn?.addEventListener('click', () => {
+        els.filtersRow?.classList.toggle('filters-visible');
+        els.filterToggleBtn.classList.toggle('active');
+      });
+
+      // Pool: click cycles 0 â†’ 1 â†’ 2 â†’ 3 â†’ 4 â†’ 0
+      els.poolGrid.addEventListener('click', (e) => {
+        const tile = e.target.closest('.pool-tile');
+        if (!tile) return;
+        tryAdd(tile.dataset.cardId);
+      });
+
+      // Deck tiles: click cycles 1 â†’ 2 â†’ 3 â†’ 4 â†’ 1 (never zero).
+      // The Ã— badge is the only path back to 0.
+      function bindDeckGrid(grid) {
+        grid.addEventListener('click', (e) => {
+          const tile = e.target.closest('.deck-tile');
+          if (!tile) return;
+          if (e.target.closest('.deck-tile-remove')) {
+            e.stopPropagation();
+            tryRemove(tile.dataset.cardId);
+            return;
+          }
+          deckCycleQty(tile.dataset.cardId);
+        });
+      }
+      bindDeckGrid(els.mainGrid);
+      bindDeckGrid(els.resourceGrid);
+
+      // Pool: load more
+      els.loadMoreBtn?.addEventListener('click', () => renderPool(false));
+
+      // Toolbar
+      els.clearBtn?.addEventListener('click', () => {
+        if (totalCount(main) + totalCount(resource) === 0) return;
+        clearDeck();
+      });
+
+      els.exportBtn?.addEventListener('click', () => {
+        els.ioTextarea.value = exportText();
+        els.ioModal.classList.add('show');
+        els.ioApplyBtn.style.display = 'none';
+        els.ioCopyBtn.style.display = '';
+        $('#ioTitle').textContent = 'Export deck';
+      });
+
+      els.importBtn?.addEventListener('click', () => {
+        els.ioTextarea.value = '';
+        els.ioModal.classList.add('show');
+        els.ioApplyBtn.style.display = '';
+        els.ioCopyBtn.style.display = 'none';
+        $('#ioTitle').textContent = 'Import deck';
+      });
+
+      els.ioClose?.addEventListener('click', () => els.ioModal.classList.remove('show'));
+      els.ioModal?.addEventListener('click', (e) => { if (e.target === els.ioModal) els.ioModal.classList.remove('show'); });
+
+      els.ioCopyBtn?.addEventListener('click', () => {
+        navigator.clipboard.writeText(els.ioTextarea.value).then(() => {
+          els.ioCopyBtn.textContent = 'Copied!';
+          setTimeout(() => els.ioCopyBtn.textContent = 'Copy', 1500);
+        });
+      });
+
+      els.ioApplyBtn?.addEventListener('click', () => {
+        importText(els.ioTextarea.value);
+        els.ioModal.classList.remove('show');
+      });
+
+      // Mobile tabs
+      els.mobileTabs.forEach(t => {
+        t.addEventListener('click', () => {
+          els.mobileTabs.forEach(x => x.classList.remove('active'));
+          t.classList.add('active');
+          els.builderLayout.dataset.mobileTab = t.dataset.tab;
+        });
+      });
+
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ?deck=N URL-PARAM IMPORT (from /decklists "Use in Builder")
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // Lazy-fetched only when ?deck=N is in the URL; the JSON is no
+       // longer inlined into builder.html so cold visits skip the payload.
+      async function loadFromQueryDeck() {
+        const params = new URLSearchParams(location.search);
+        const idxStr = params.get('deck');
+        if (!idxStr) return false;
+        const idx = parseInt(idxStr, 10);
+        if (Number.isNaN(idx)) return false;
+        let tournamentDecks = [];
+        try {
+          const res = await fetch('/data/tournament-decks.json');
+          if (!res.ok) return false;
+          tournamentDecks = await res.json();
+        } catch { return false; }
+        const td = tournamentDecks[idx];
+        if (!td) return false;
+
+        main.clear();
+        resource.clear();
+        for (const c of td.cards) {
+          const card = cardById.get(c.id);
+          if (!card) continue;
+          (isResource(card) ? resource : main).set(c.id, c.qty);
+        }
+        if (td.name) deckName = td.name;
+        renderDeck();
+        renderPool(true);
+        updateCounts();
+        validate();
+        persistToHash();
+        return true;
+      }
+
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // CURSOR-FOLLOWING HOVER PREVIEW (mouse devices only â€” touch
+      // devices don't have hover, so we skip the binding entirely).
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      const canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+      if (canHover && els.hoverPreview) {
+        const PREVIEW_W = 320;
+        const OFFSET = 20;
+        let currentSrc = '';
+
+        const showPreview = (e, cardId) => {
+          if (!cardId) return;
+          const src = `/cards/${cardId}-640w.webp`;
+          if (src !== currentSrc) {
+            els.hoverPreview.innerHTML = '<img src="' + src + '" alt="" />';
+            currentSrc = src;
+          }
+          let left = e.clientX + OFFSET;
+          let top = e.clientY;
+          if (left + PREVIEW_W > window.innerWidth) left = e.clientX - PREVIEW_W - OFFSET;
+          if (top - PREVIEW_W / 2 * 1.4 < 0) top = PREVIEW_W * 0.7 + 10;
+          if (top + PREVIEW_W / 2 * 1.4 > window.innerHeight) top = window.innerHeight - PREVIEW_W * 0.7 - 10;
+          els.hoverPreview.style.left = left + 'px';
+          els.hoverPreview.style.top = top + 'px';
+          els.hoverPreview.style.transform = 'translateY(-50%)';
+          els.hoverPreview.style.display = 'block';
+        };
+        const hidePreview = () => {
+          els.hoverPreview.style.display = 'none';
+          currentSrc = '';
+        };
+
+        // Pool tiles (right side)
+        els.poolGrid.addEventListener('mousemove', (e) => {
+          const tile = e.target.closest('.pool-tile');
+          if (!tile) { hidePreview(); return; }
+          showPreview(e, tile.dataset.cardId);
+        });
+        els.poolGrid.addEventListener('mouseleave', hidePreview);
+
+        // Deck tiles on the left side (main + resource grids).
+        // Same handler, different selector â€” .deck-tile lives in both grids.
+        const deckHover = (e) => {
+          const tile = e.target.closest('.deck-tile');
+          if (!tile) { hidePreview(); return; }
+          showPreview(e, tile.dataset.cardId);
+        };
+        els.mainGrid.addEventListener('mousemove', deckHover);
+        els.mainGrid.addEventListener('mouseleave', hidePreview);
+        els.resourceGrid.addEventListener('mousemove', deckHover);
+        els.resourceGrid.addEventListener('mouseleave', hidePreview);
+      }
+
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // TCGPLAYER BUY MODAL â€” mirrors optcg's pattern. Per-card AA
+      // cycling, qty editor, total price, mass-entry URL on submit.
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      const TCG_AFFILIATE_BASE = 'https://partner.tcgplayer.com/c/7021525/1780961/21018';
+
+      function buildBuyItems() {
+        // Combine main + resource; keep insertion order.
+        const items = [];
+        for (const [id, qty] of main.entries()) items.push({ id, qty });
+        for (const [id, qty] of resource.entries()) items.push({ id, qty });
+        return items;
+      }
+
+      function deckTotalPrice() {
+        let total = 0;
+        for (const { id, qty } of buildBuyItems()) {
+          const c = cardById.get(id);
+          if (c?.price) total += Number(c.price) * qty;
+        }
+        return total;
+      }
+
+      function refreshBuyButton() {
+        const items = buildBuyItems();
+        const total = deckTotalPrice();
+        const hasAny = items.some(({ id }) => {
+          const c = cardById.get(id);
+          return c?.tcgPlayerId && c?.price > 0;
+        });
+        els.buyDeckBtn.disabled = !hasAny;
+        els.buyPriceLabel.textContent = '$' + total.toFixed(2);
+      }
+
+      function escAttr(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+      }
+
+      function openBuyModal() {
+        const items = buildBuyItems();
+        if (items.length === 0) return;
+        const html = items.map(({ id, qty }) => {
+          const c = cardById.get(id);
+          if (!c) return '';
+          const price = c.price ? Number(c.price) : 0;
+          const tpid = c.tcgPlayerId || '';
+          const buyable = price > 0 && tpid;
+          const totalCardPrice = (price * qty).toFixed(2);
+          // Find sibling printings for AA cycle
+          const siblings = allCards
+            .filter(s => s.baseId === c.baseId)
+            .map(s => s.id);
+          const hasVariants = siblings.length > 1;
+          return `
+            <div class="tcg-card-item ${buyable ? 'selected' : 'disabled'}"
+                 data-card-id="${escAttr(id)}" data-tcg-id="${escAttr(tpid)}"
+                 data-price="${price}" data-qty="${qty}">
+              <input type="checkbox" class="tcg-card-checkbox" ${buyable ? 'checked' : 'disabled'}>
+              <div class="tcg-card-img-wrapper">
+                ${hasVariants ? '<button type="button" class="tcg-aa-prev-btn tcg-aa-badge-left" aria-label="Previous printing">â—€</button>' : ''}
+                <img class="tcg-card-img"
+                     src="/cards/${escAttr(id)}-160w.webp"
+                     srcset="/cards/${escAttr(id)}-160w.webp 160w, /cards/${escAttr(id)}-640w.webp 640w"
+                     sizes="120px" width="160" height="224"
+                     alt="${escAttr(c.name || id)}" />
+                ${hasVariants ? '<button type="button" class="tcg-aa-next-btn tcg-aa-badge-right" aria-label="Next printing">â–¶</button>' : ''}
+              </div>
+              <div class="tcg-card-info">
+                <div class="tcg-card-name">${escAttr(c.name || id)}</div>
+                <div class="tcg-card-quantity">
+                  <input type="number" class="tcg-quantity-input" min="1" max="99" value="${qty}" ${buyable ? '' : 'disabled'}>
+                  <div class="tcg-card-price">${price > 0 ? '$' + totalCardPrice : 'N/A'}</div>
+                </div>
+              </div>
+            </div>
+          `;
+        }).filter(Boolean).join('');
+        els.tcgCardList.innerHTML = html;
+        els.tcgModal.classList.add('show');
+        recalcTcgTotal();
+      }
+
+      function recalcTcgTotal() {
+        let total = 0;
+        let anySelected = false;
+        els.tcgCardList.querySelectorAll('.tcg-card-item').forEach(item => {
+          const cb = item.querySelector('.tcg-card-checkbox');
+          if (!cb || cb.disabled) { item.classList.remove('selected'); return; }
+          const qty = Math.max(1, Math.min(99, parseInt(item.querySelector('.tcg-quantity-input').value) || 1));
+          const price = parseFloat(item.dataset.price) || 0;
+          if (cb.checked) {
+            total += price * qty;
+            item.classList.add('selected');
+            anySelected = true;
+          } else {
+            item.classList.remove('selected');
+          }
+        });
+        els.totalPriceLabel.textContent = '$' + total.toFixed(2);
+        els.buyOnTCGBtn.disabled = !anySelected;
+        if (els.toggleSelectAllBtn) {
+          els.toggleSelectAllBtn.textContent = anySelected ? 'Unselect All' : 'Select All';
+        }
+      }
+
+      function cycleVariant(item, direction) {
+        const cardId = item.dataset.cardId;
+        const card = cardById.get(cardId);
+        if (!card) return;
+        const siblings = allCards
+          .filter(s => s.baseId === card.baseId)
+          .sort((a, b) => Number(a.tcgPlayerId || 0) - Number(b.tcgPlayerId || 0));
+        if (siblings.length <= 1) return;
+        const curIdx = siblings.findIndex(s => s.id === cardId);
+        const next = siblings[(curIdx + direction + siblings.length) % siblings.length];
+        const buyable = next.tcgPlayerId && next.price > 0;
+        const qty = parseInt(item.dataset.qty) || 1;
+        // Update DOM
+        item.dataset.cardId = next.id;
+        item.dataset.tcgId = next.tcgPlayerId || '';
+        item.dataset.price = String(next.price ?? 0);
+        item.classList.toggle('disabled', !buyable);
+        const img = item.querySelector('.tcg-card-img');
+        if (img) {
+          img.src = `/cards/${next.id}-160w.webp`;
+          img.srcset = `/cards/${next.id}-160w.webp 160w, /cards/${next.id}-640w.webp 640w`;
+          img.alt = next.name || next.id;
+        }
+        const cb = item.querySelector('.tcg-card-checkbox');
+        if (cb) {
+          cb.disabled = !buyable;
+          cb.checked = buyable;
+        }
+        const qtyInput = item.querySelector('.tcg-quantity-input');
+        if (qtyInput) qtyInput.disabled = !buyable;
+        const totalCardPrice = ((next.price ?? 0) * qty).toFixed(2);
+        const priceEl = item.querySelector('.tcg-card-price');
+        if (priceEl) priceEl.textContent = next.price > 0 ? '$' + totalCardPrice : 'N/A';
+        recalcTcgTotal();
+      }
+
+      els.buyDeckBtn?.addEventListener('click', () => openBuyModal());
+      els.tcgClose?.addEventListener('click', () => { els.tcgModal.classList.remove('show'); });
+      els.tcgModal?.addEventListener('click', (e) => { if (e.target === els.tcgModal) els.tcgModal.classList.remove('show'); });
+
+      els.tcgCardList?.addEventListener('click', (e) => {
+        const prev = e.target.closest('.tcg-aa-prev-btn');
+        const next = e.target.closest('.tcg-aa-next-btn');
+        if (prev || next) {
+          e.stopPropagation();
+          cycleVariant(e.target.closest('.tcg-card-item'), prev ? -1 : 1);
+          return;
+        }
+        // Toggle selection on card click (skip checkbox + qty input themselves)
+        if (e.target.closest('.tcg-quantity-input') || e.target.closest('.tcg-card-checkbox')) return;
+        const item = e.target.closest('.tcg-card-item');
+        if (!item || item.classList.contains('disabled')) return;
+        const cb = item.querySelector('.tcg-card-checkbox');
+        if (cb && !cb.disabled) {
+          cb.checked = !cb.checked;
+          recalcTcgTotal();
+        }
+      });
+      els.tcgCardList?.addEventListener('change', (e) => {
+        if (e.target.classList.contains('tcg-card-checkbox') ||
+            e.target.classList.contains('tcg-quantity-input')) {
+          recalcTcgTotal();
+        }
+      });
+      els.tcgCardList?.addEventListener('input', (e) => {
+        if (e.target.classList.contains('tcg-quantity-input')) recalcTcgTotal();
+      });
+
+      els.toggleSelectAllBtn?.addEventListener('click', () => {
+        const boxes = els.tcgCardList.querySelectorAll('.tcg-card-checkbox:not(:disabled)');
+        const anyChecked = Array.from(boxes).some(cb => cb.checked);
+        boxes.forEach(cb => cb.checked = !anyChecked);
+        recalcTcgTotal();
+      });
+
+      els.buyOnTCGBtn?.addEventListener('click', () => {
+        const selected = [];
+        els.tcgCardList.querySelectorAll('.tcg-card-item').forEach(item => {
+          const cb = item.querySelector('.tcg-card-checkbox');
+          if (!cb || !cb.checked || cb.disabled) return;
+          const tpid = item.dataset.tcgId;
+          const qty = Math.max(1, Math.min(99, parseInt(item.querySelector('.tcg-quantity-input').value) || 1));
+          if (tpid) selected.push(qty + '-' + tpid);
+        });
+        if (!selected.length) return;
+        const massUrl = 'https://www.tcgplayer.com/massentry?c=' + encodeURIComponent(selected.join('||')) + '&productline=Star Wars Unlimited';
+        const affUrl = TCG_AFFILIATE_BASE + '?u=' + encodeURIComponent(massUrl) + '&subId1=swutcg-builder';
+        window.open(affUrl, '_blank', 'noopener');
+      });
+
+      // (renderDeck() already calls refreshBuyButton() at its end)
+
+      // Esc closes modals
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        if (els.tcgModal.classList.contains('show')) els.tcgModal.classList.remove('show');
+        if (els.ioModal.classList.contains('show')) els.ioModal.classList.remove('show');
+      });
+
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // INIT
+      // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ?deck=N takes priority over hash/localStorage when present.
+      // The lazy fetch is async, so initial render uses hash/localStorage
+      // immediately, then the tournament-deck import (if any) re-renders.
+      const hasDeckParam = new URLSearchParams(location.search).has('deck');
+      if (!hasDeckParam) loadFromHash();
+      renderPool(true);
+      renderDeck();
+      updateCounts();
+      validate();
+      refreshBuyButton();
+      if (hasDeckParam) {
+        loadFromQueryDeck().then(loaded => {
+          if (!loaded) {
+            loadFromHash();
+            renderDeck();
+            renderPool(true);
+            updateCounts();
+            refreshBuyButton();
+          }
+        });
+      }
+    })();
+  </script>
+
+  <style is:global>
+    .builder-page { max-width: 100%; margin: 0 auto; padding: 0 0 var(--space-2xl); }
+
+    /* Layout: half/half â€” deck left, pool right; mobile tabs under 1024px */
+    .builder-layout { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg); align-items: start; }
+    @media (max-width: 1023px) {
+      .builder-layout { grid-template-columns: 1fr; }
+      .builder-layout[data-mobile-tab="cards"] .deck-area { display: none; }
+      .builder-layout[data-mobile-tab="deck"] .pool-area { display: none; }
+    }
+    /* Hide the site footer while the deck tab is active on mobile so the
+       fixed Cards/Deck switch isn't competing with footer content. */
+    @media (max-width: 1023px) {
+      body:has(.builder-layout[data-mobile-tab="deck"]) .site-footer { display: none; }
+    }
+
+    /* Deck area */
+    .deck-area { background: transparent; border: none; padding: 0; position: sticky; top: var(--space-md); max-height: calc(100vh - var(--space-md) * 2); overflow-y: auto; overflow-x: hidden; min-width: 0; scrollbar-width: none; -ms-overflow-style: none; }
+    .deck-area::-webkit-scrollbar { display: none; width: 0; height: 0; }
+    @media (max-width: 1023px) { .deck-area { position: static; max-height: none; } }
+    /* Match optcg: same padding as .search-bar so both columns share the
+       same vertical envelope â€” buttons centered in their row line up with
+       the search-bar text centered in its row, and bottom edges + underline
+       end at the same baseline. */
+    .deck-controls { display: flex; gap: 8px; flex-direction: column; align-items: stretch; margin-bottom: var(--space-md); padding: var(--space-sm) 0; position: sticky; top: 0; background: var(--color-bg-primary); z-index: 6; }
+    .deck-controls-buttons { display: flex; gap: 6px; flex-wrap: nowrap; align-items: center; }
+    .deck-controls-buttons .deck-btn { flex: 1 1 0; min-width: 0; padding: 6px 8px; justify-content: center; }
+    .deck-main-title { margin: 0; font-size: 1rem; display: inline-flex; align-items: center; }
+
+    .deck-btn { padding: 6px 12px; background: var(--color-bg-tertiary); color: var(--color-text-primary); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: background-color var(--transition-fast), border-color var(--transition-fast); }
+    .deck-btn:hover { background: var(--color-bg-elevated); border-color: var(--color-accent-primary); }
+    .deck-btn-primary { background: var(--color-accent-primary); color: var(--color-text-inverted); border-color: var(--color-accent-primary); }
+    .deck-btn-danger { color: var(--color-swu-red); border-color: var(--color-swu-red); }
+    .deck-btn-danger:hover { background: rgba(198, 31, 43, 0.1); border-color: var(--color-swu-red); }
+
+
+    .deck-section { margin-bottom: var(--space-md); }
+    .deck-section-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--space-xs); }
+    .deck-section-head h3 { margin: 0; font-size: 1rem; }
+    .deck-count { display: inline-block; padding: 2px 8px; border-radius: 10px; background: var(--color-bg-tertiary); color: var(--color-text-secondary); font-family: monospace; font-size: 0.85rem; margin-left: 6px; }
+    .deck-count.count-ok { background: rgba(46, 139, 87, 0.2); color: #6CD89A; }
+    .deck-count.count-over { background: rgba(198, 31, 43, 0.2); color: #F08896; }
+
+    .deck-grid { display: flex; flex-wrap: wrap; align-content: flex-start; gap: var(--space-md); }
+    .deck-empty { padding: var(--space-md); margin: 0; color: var(--color-text-tertiary); font-size: 0.85rem; text-align: center; border: 1px dashed var(--color-border); border-radius: var(--radius-sm); }
+    .deck-type-group { flex: 1 1 220px; min-width: 0; }
+    .deck-type-group:first-of-type { flex: 0 0 100%; }
+    .deck-type-label { margin: 0 0 10px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-swu-yellow); }
+    .deck-tile-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 12px; padding: 4px 6px 8px; }
+    .deck-tile { position: relative; aspect-ratio: 5 / 7; border-radius: 4px; cursor: pointer; transition: transform var(--transition-fast); z-index: 1; }
+    .deck-tile:hover { transform: translateY(-2px); z-index: 5; }
+    .deck-tile img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; display: block; }
+    .deck-tile-qty { position: absolute; bottom: -4px; left: -4px; min-width: 22px; height: 22px; border-radius: 50%; background: var(--color-swu-yellow); color: var(--color-text-inverted); font-weight: 700; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; border: 2px solid var(--color-bg-secondary); z-index: 10; }
+    .deck-tile-remove { position: absolute; top: -5px; right: -5px; width: 24px; height: 24px; padding: 0; background: var(--color-swu-red); color: #fff; border: 2px solid var(--color-bg-secondary); border-radius: 50%; font-size: 14px; font-weight: 700; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 20; }
+    .deck-tile-remove:hover { background: #E0353F; }
+    /* On mouse/hover devices, only show the Ã— on tile hover to keep the
+       deck tidy. Touch devices fall back to always-visible. */
+    @media (hover: hover) and (pointer: fine) {
+      .deck-tile-remove { display: none; }
+      .deck-tile:hover .deck-tile-remove { display: flex; }
+    }
+
+    /* Pool */
+    .pool-area { display: flex; flex-direction: column; gap: 0; }
+    .pool-area .controls { margin-bottom: var(--space-sm); }
+    @media (max-width: 767px) {
+      /* On phones, force the search bar to its own line so color chips +
+         AA + filter all share the next row, centered together. */
+      .pool-area .top-controls-row { justify-content: center; align-items: center; }
+      .pool-area .search-bar { flex: 0 0 100%; min-width: 0; }
+      .pool-area .top-color-filter { justify-content: center; }
+    }
+    .pool-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-sm); }
+    .pool-tile { position: relative; aspect-ratio: 5 / 7; cursor: pointer; border-radius: var(--radius-sm); transition: transform var(--transition-fast), box-shadow var(--transition-fast); }
+    .pool-tile img { border-radius: var(--radius-sm); }
+    .pool-tile:hover { transform: translateY(-2px); box-shadow: 0 0 0 2px var(--color-swu-yellow); }
+    .pool-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .pool-tile.in-deck { box-shadow: 0 0 0 2px var(--color-accent-primary); }
+    /* Shake on rejected add (deck full, max-copies reached, etc.) */
+    .pool-tile.shake { animation: shake-rej 0.36s cubic-bezier(.36,.07,.19,.97); box-shadow: 0 0 0 2px #F08896; }
+    @keyframes shake-rej {
+      10%, 90% { transform: translateX(-2px); }
+      20%, 80% { transform: translateX(3px); }
+      30%, 50%, 70% { transform: translateX(-5px); }
+      40%, 60% { transform: translateX(5px); }
+    }
+    .pool-qty-badge { position: absolute; bottom: -6px; left: -6px; min-width: 36px; height: 36px; border-radius: 50%; background: var(--color-swu-yellow); color: var(--color-text-inverted); font-weight: 700; font-size: 1.05rem; display: flex; align-items: center; justify-content: center; border: 3px solid var(--color-bg-secondary); }
+    .empty-state-inline { padding: var(--space-2xl); text-align: center; color: var(--color-text-tertiary); border: 1px dashed var(--color-border); border-radius: var(--radius-md); }
+    .pool-more { display: flex; justify-content: center; padding: var(--space-md) 0; }
+
+    /* Mobile tab switch â€” fixed at bottom, no background bar, sits above the nav */
+    .mobile-tab-switch { display: none; position: fixed; left: 0; right: 0; bottom: 64px; background: transparent; padding: var(--space-sm); gap: 8px; justify-content: center; z-index: 90; pointer-events: none; }
+    .mobile-tab-switch .mobile-tab { pointer-events: auto; }
+    @media (max-width: 1023px) { .mobile-tab-switch { display: flex; } }
+    @media (min-width: 768px) and (max-width: 1023px) { .mobile-tab-switch { bottom: var(--space-md); } }
+    .mobile-tab { flex: 0 1 auto; padding: 10px 18px; background: var(--color-bg-elevated); border: 1px solid var(--color-border); color: var(--color-text-secondary); border-radius: var(--radius-md); cursor: pointer; font-weight: 700; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+    .mobile-tab.active { background: var(--color-accent-primary); color: var(--color-text-inverted); border-color: var(--color-accent-primary); }
+    .mobile-tab-count { font-family: monospace; font-size: 0.85rem; }
+
+    /* Import / Export modal â€” reuses .modal infrastructure */
+    .modal-content-narrow { max-width: 600px; }
+    .io-help { color: var(--color-text-tertiary); margin: 0 0 var(--space-sm); font-size: 0.9rem; }
+    .io-help code { background: var(--color-bg-tertiary); padding: 2px 6px; border-radius: 3px; }
+    .io-textarea { width: 100%; padding: var(--space-sm); background: var(--color-bg-primary); color: var(--color-text-primary); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-family: monospace; font-size: 0.9rem; resize: vertical; }
+    .io-textarea:focus { outline: none; border-color: var(--color-accent-primary); }
+    .io-actions { display: flex; gap: var(--space-sm); justify-content: flex-end; margin-top: var(--space-md); }
+
+    .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
+
+    /* Buy on TCGplayer button (in deck toolbar) */
+    .deck-btn-buy { background: var(--color-swu-yellow); color: var(--color-text-inverted); border-color: var(--color-swu-yellow); display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 0.85rem; font-weight: 800; }
+    .deck-btn-buy:hover:not(:disabled) { background: var(--color-swu-yellow-hi); border-color: var(--color-swu-yellow-hi); }
+    .deck-btn-buy:disabled { opacity: 0.4; cursor: not-allowed; background: var(--color-bg-tertiary); color: var(--color-text-tertiary); border-color: var(--color-border); }
+    .buy-price { font-variant-numeric: tabular-nums; font-weight: 800; font-size: 0.85rem; }
+    /* Mask the white TCGplayer silhouette and recolor it to match
+       the button's text color (dark on yellow, grey when disabled). */
+    .buy-cart-icon { display: inline-block; width: 18px; height: 14px; flex-shrink: 0; background-color: var(--color-text-inverted); -webkit-mask: url('/tcgplayer-logo.webp') center / contain no-repeat; mask: url('/tcgplayer-logo.webp') center / contain no-repeat; }
+    .deck-btn-buy:disabled .buy-cart-icon { background-color: var(--color-text-tertiary); }
+
+    /* Cursor-following hover preview (desktop) */
+    #cardHoverPreview {
+      display: none;
+      position: fixed;
+      width: 320px;
+      z-index: 1001;
+      pointer-events: none;
+    }
+    #cardHoverPreview img {
+      width: 100%;
+      border-radius: 12px;
+      box-shadow: 0 12px 36px rgba(0,0,0,0.5);
+      display: block;
+    }
+
+    /* TCGplayer Buy modal */
+    .tcg-modal-content { max-width: 1200px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; gap: 0; padding: var(--space-xl); position: relative; }
+    .tcg-modal-content .modal-close { position: absolute; top: var(--space-sm); right: var(--space-md); background: none; border: none; font-size: 32px; line-height: 1; color: var(--color-text-tertiary); cursor: pointer; padding: 0; transition: color 0.15s; }
+    .tcg-modal-content .modal-close:hover { color: var(--color-text-primary); }
+    .tcg-modal-content .modal-body { flex: 1; overflow-y: auto; padding-top: var(--space-md); }
+    .tcg-card-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--space-md); }
+    .tcg-card-item { display: flex; flex-direction: column; align-items: center; padding: var(--space-sm); background: var(--color-bg-tertiary); border-radius: var(--radius-lg); transition: all 0.2s; position: relative; border: 2px solid transparent; cursor: pointer; user-select: none; }
+    .tcg-card-item:hover:not(.disabled) { background: var(--color-bg-secondary); }
+    .tcg-card-item.selected { border-color: var(--color-swu-yellow); background: var(--color-bg-secondary); }
+    .tcg-card-item.disabled { opacity: 0.55; cursor: not-allowed; }
+    .tcg-card-checkbox { display: none; }
+    .tcg-card-img-wrapper { position: relative; width: 100%; margin-bottom: var(--space-sm); }
+    .tcg-card-img { width: 100%; height: auto; aspect-ratio: 5/7; object-fit: cover; border-radius: var(--radius-md); display: block; }
+    .tcg-aa-prev-btn, .tcg-aa-next-btn { position: absolute; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; padding: 0; border: none; border-radius: 50%; background: rgba(0,0,0,0.7); color: var(--color-swu-yellow); cursor: pointer; z-index: 2; display: flex; align-items: center; justify-content: center; font-size: 12px; transition: background 0.15s; }
+    .tcg-aa-prev-btn:hover, .tcg-aa-next-btn:hover { background: var(--color-swu-yellow); color: var(--color-text-inverted); }
+    .tcg-aa-badge-left { left: -6px; }
+    .tcg-aa-badge-right { right: -6px; }
+    .tcg-card-info { width: 100%; text-align: center; }
+    .tcg-card-name { font-size: 0.85rem; color: var(--color-text-primary); margin-bottom: var(--space-xs); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; min-height: 2.5em; }
+    .tcg-card-quantity { font-size: 0.85rem; color: var(--color-text-secondary); display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .tcg-quantity-input { width: 50px; padding: 3px 6px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-bg-primary); color: var(--color-text-primary); font: inherit; font-size: 0.85rem; text-align: center; -moz-appearance: textfield; }
+    .tcg-quantity-input::-webkit-outer-spin-button, .tcg-quantity-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .tcg-card-price { font-weight: 700; color: var(--color-text-primary); }
+    .tcg-modal-content .modal-footer { display: flex; justify-content: space-between; align-items: center; padding-top: var(--space-md); margin-top: var(--space-md); border-top: 1px solid var(--color-border); flex-shrink: 0; gap: var(--space-md); }
+    .footer-left, .footer-right { display: flex; align-items: center; gap: var(--space-sm); }
+    .select-btn { background: var(--color-bg-tertiary); color: var(--color-text-secondary); border: 1px solid var(--color-border); padding: 6px 12px; border-radius: var(--radius-md); cursor: pointer; font: inherit; font-size: 0.85rem; transition: all 0.15s; }
+    .select-btn:hover { background: var(--color-bg-secondary); color: var(--color-text-primary); border-color: var(--color-swu-yellow); }
+    .total-price { font-size: 1rem; color: var(--color-text-secondary); }
+    .total-price span { color: var(--color-swu-yellow); font-weight: 700; }
+    .tcg-buy-btn { background: var(--color-swu-yellow); color: var(--color-text-inverted); border: none; padding: 8px 16px; border-radius: var(--radius-md); font: inherit; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+    .tcg-buy-btn:hover:not(:disabled) { background: var(--color-swu-yellow-hi); }
+    .tcg-buy-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    @media (max-width: 768px) {
+      .tcg-card-list { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: var(--space-sm); }
+      .tcg-modal-content .modal-footer { flex-direction: column; align-items: stretch; }
+    }
+  </style>
+</Layout>

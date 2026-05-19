@@ -1,0 +1,66 @@
+﻿# robots.txt for swutcg.one â€” Star Wars Unlimited Database
+# https://www.swutcg.one/robots.txt
+
+Sitemap: https://www.swutcg.one/sitemap.xml
+
+User-agent: *
+Allow: /
+Disallow: /sw.js
+Disallow: /manifest.json
+Crawl-delay: 1
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
+
+User-agent: Slurp
+Allow: /
+Crawl-delay: 1
+
+# Throttle aggressive SEO scrapers
+User-agent: AhrefsBot
+Crawl-delay: 5
+
+User-agent: SemrushBot
+Crawl-delay: 5
+
+User-agent: DotBot
+Crawl-delay: 5
+
+# AI search crawlers â€” allowed for AI-search discovery
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: FacebookBot
+Allow: /
+
+# Block TikTok crawler
+User-agent: Bytespider
+Disallow: /

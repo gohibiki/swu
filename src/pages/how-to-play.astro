@@ -1,0 +1,185 @@
+﻿---
+export const prerender = true;
+
+import Layout from '../layouts/Layout.astro';
+import Navigation from '../components/Navigation.astro';
+
+const pageURL = 'https://www.swutcg.one/how-to-play';
+const RULES_PDF = '/swu-comprehensive-rules-1.6.0.pdf';
+const RULES_VERSION = 'v1.6.0';
+const RULES_DATE = 'April 9, 2026';
+---
+
+<Layout
+  title="How to Play Star Wars Unlimited - Star Wars Unlimited Rules & Keywords"
+  description="Learn the Star Wars Unlimited in five minutes. Deck construction, turn flow, card types, keyword effects, and the official comprehensive rules PDF."
+  canonical={pageURL}
+  pageId="how-to-play"
+>
+  <script is:inline type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "How to Play the Star Wars Unlimited",
+    "description": "A beginner-friendly guide to the Star Wars Unlimited with the official comprehensive rules PDF.",
+    "url": pageURL,
+    "datePublished": "2026-05-11"
+  })} />
+
+  <script is:inline type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.swutcg.one/" },
+      { "@type": "ListItem", "position": 2, "name": "How to Play", "item": pageURL }
+    ]
+  })} />
+
+  <Navigation activePage="how-to-play" />
+
+  <main class="how-to-play">
+    <header>
+      <h1>How to Play Star Wars Unlimited - Rules & Keywords</h1>
+      <p class="page-intro">
+        <strong>How to play Star Wars Unlimited (Star Wars Unlimited)</strong>: Fantasy Flight Games's two-player trading card game. Five-minute walkthrough covering rules, turn flow, and <strong>keyword effects</strong>. Pair it with the <a href="/database">card database</a>, the <a href="/builder">deck builder</a>, or <a href="/decklists">tournament decklists</a>.
+      </p>
+    </header>
+
+    <section class="rules-cta">
+      <div class="rules-cta-card">
+        <h2>Official Comprehensive Rules</h2>
+        <p>Fantasy Flight Games's full rulebook covering every interaction, edge case, and keyword definition. {RULES_VERSION}, updated {RULES_DATE}.</p>
+        <a href={RULES_PDF} target="_blank" rel="noopener" class="rules-button">Open the rules PDF</a>
+      </div>
+    </section>
+
+    <section class="rules-section">
+      <h2>1. Deck construction</h2>
+      <ul>
+        <li><strong>50 cards</strong> in your main deck (Units, Pilots, Commands, and Bases). Reference: rule 6-1-1.</li>
+        <li><strong>10 cards</strong> in your resource deck (Resource cards only). Resources are not in the main deck.</li>
+        <li><strong>One or two colors</strong> only per deck: Blue, Green, Red, or White.</li>
+        <li><strong>Maximum 4 copies</strong> of any card sharing the same card number.</li>
+        <li>Any number of identical Resource cards is allowed in the resource deck.</li>
+        <li>You also need one <strong>EX Base</strong> and one <strong>EX Resource</strong> token at hand.</li>
+      </ul>
+    </section>
+
+    <section class="rules-section">
+      <h2>2. The five card types</h2>
+      <dl class="card-type-list">
+        <dt>Unit</dt>
+        <dd>The fighters. Have <strong>AP</strong> (attack) and <strong>HP</strong> (hit points). Only Units can attack. A newly deployed Unit cannot attack the same turn unless it has a paired Pilot satisfying its Link condition (a "Link Unit"), in which case it can attack immediately.</dd>
+
+        <dt>Pilot</dt>
+        <dd>Placed beneath a Unit and paired with it. Adds AP/HP modifiers and effects to the Unit. A Unit can only have one Pilot at a time. Pilots have traits (e.g. <em>Newtype</em>, <em>Earth Federation</em>).</dd>
+
+        <dt>Command</dt>
+        <dd>One-shot effect cards played in the main phase (<code>[Main]</code>) or action step (<code>[Action]</code>). Some Commands have a Pilot effect on the bottom. Pair them as a Pilot instead of resolving the command.</dd>
+
+        <dt>Base</dt>
+        <dd>Deployed into your shield area. While a Base is present, damage to the shield area hits the Base first. Bases have AP and HP.</dd>
+
+        <dt>Resource</dt>
+        <dd>Lives in the resource deck (10 cards). One Resource enters the resource area each turn during the resource phase. This is how you ramp up to pay costs.</dd>
+      </dl>
+    </section>
+
+    <section class="rules-section">
+      <h2>3. Turn flow</h2>
+      <ol>
+        <li><strong>Start phase</strong>: active effects trigger, all your rested cards become active.</li>
+        <li><strong>Draw phase</strong>: draw one card from your deck. (Player 1 skips this on turn 1.)</li>
+        <li><strong>Resource phase</strong>:place one Resource card from your resource deck into your resource area.</li>
+        <li><strong>Main phase</strong>: deploy Units, pair Pilots, deploy Bases, play <code>[Main]</code> Commands, activate <code>Activateãƒ»Main</code> effects, and declare attacks with your Units.</li>
+        <li><strong>End phase</strong>:<code>&lt;Repair&gt;</code> triggers, end-of-turn effects resolve.</li>
+      </ol>
+    </section>
+
+    <section class="rules-section">
+      <h2>4. Attacking and battles</h2>
+      <p>
+        A Unit attacks by resting (rotating) itself and targeting either an enemy Unit or directly into the opponent's shield area. The defender may declare an action step in response, then resolve the battle:
+      </p>
+      <ul>
+        <li>Both Units deal battle damage equal to their AP simultaneously.</li>
+        <li>If a Unit's HP reaches zero, it is destroyed and placed into the trash.</li>
+        <li>If damage hits the shield area, it destroys the top shield (or the Base if one is deployed). Destroyed shields reveal their <code>[Burst]</code> effect. The owner may activate it for free.</li>
+        <li>When all six starting shields are gone and an enemy Unit lands one more point of battle damage, the defender loses.</li>
+      </ul>
+    </section>
+
+    <section class="rules-section">
+      <h2>5. Keyword effects</h2>
+      <p>Most cards reference one or more keyword effects. The seven core keywords from the comprehensive rules:</p>
+      <dl class="keyword-list">
+        <dt><code>&lt;Repair X&gt;</code></dt>
+        <dd>At the end of your turn, this Unit recovers X HP.</dd>
+
+        <dt><code>&lt;Breach X&gt;</code></dt>
+        <dd>When this Unit destroys an enemy Unit with battle damage, deal X damage to the top of the opponent's shield area (the Base, if any, or the topmost shield).</dd>
+
+        <dt><code>&lt;Support X&gt;</code></dt>
+        <dd>You may rest this Unit during your main phase to give one other friendly Unit AP+X this turn.</dd>
+
+        <dt><code>&lt;Blocker&gt;</code></dt>
+        <dd>When an enemy Unit attacks, you may rest this Unit to redirect the attack to it.</dd>
+
+        <dt><code>&lt;First Strike&gt;</code></dt>
+        <dd>When attacking, this Unit deals battle damage before the defender. Destroying the defender first cancels their return damage.</dd>
+
+        <dt><code>&lt;High-Maneuver&gt;</code></dt>
+        <dd>While this Unit is attacking, enemy Units cannot activate <code>&lt;Blocker&gt;</code>.</dd>
+
+        <dt><code>&lt;Suppression&gt;</code></dt>
+        <dd>When this Unit deals battle damage to a shield, damage the top two shields simultaneously (Bursts on both still trigger).</dd>
+      </dl>
+    </section>
+
+    <section class="rules-section">
+      <h2>6. Timing keywords</h2>
+      <p>Brackets like <code>[Deploy]</code> or <code>[Attack]</code> on card text mark when an effect triggers:</p>
+      <ul>
+        <li><code>[Deploy]</code>: activates when the card is deployed.</li>
+        <li><code>[Attack]</code>: activates when the Unit declares an attack.</li>
+        <li><code>[Destroyed]</code>: activates when the Unit or Base is destroyed.</li>
+        <li><code>[Burst]</code>: activates when this card, while a shield, is destroyed. Free to activate.</li>
+        <li><code>[Main]</code> / <code>[Action]</code>: when this Command can be played.</li>
+        <li><code>[When Paired]</code>: activates when a Pilot is paired with a Unit.</li>
+        <li><code>[During Pair]</code>: passive effect on a Unit while a Pilot is paired with it.</li>
+        <li><code>Activateãƒ»Main</code> / <code>Activateãƒ»Action</code>: repeatable activated effects, usable in the named phase.</li>
+      </ul>
+    </section>
+
+    <section class="rules-cta">
+      <div class="rules-cta-card">
+        <h2>Read the full rules</h2>
+        <p>This page is the short version. For multiplayer modes, the rules management process, and the full attack-step priority chain, download the official rulebook.</p>
+        <a href={RULES_PDF} target="_blank" rel="noopener" class="rules-button">Open the rules PDF ({RULES_VERSION})</a>
+      </div>
+    </section>
+  </main>
+
+  <style is:global>
+    .how-to-play { max-width: 100%; margin: 0 auto; padding: var(--space-md) 0 var(--space-2xl); }
+    .how-to-play header h1 { margin: 0 0 var(--space-sm); }
+    .how-to-play .page-intro { color: var(--color-text-secondary); margin: 0 0 var(--space-xl); }
+    .rules-section { margin: var(--space-xl) 0; }
+    .rules-section h2 { margin: 0 0 var(--space-md); border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-sm); }
+    .rules-section ul, .rules-section ol { padding-left: var(--space-lg); line-height: 1.65; }
+    .rules-section li { margin: var(--space-xs) 0; }
+    .rules-section code { background: var(--color-bg-secondary); padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+    .card-type-list, .keyword-list { display: grid; grid-template-columns: minmax(120px, max-content) 1fr; gap: var(--space-sm) var(--space-md); margin: 0; }
+    .card-type-list dt, .keyword-list dt { font-weight: var(--font-weight-bold); color: var(--color-swu-gold); }
+    .card-type-list dd, .keyword-list dd { margin: 0; color: var(--color-text-secondary); line-height: 1.5; }
+    .rules-cta { margin: var(--space-xl) 0; }
+    .rules-cta-card { background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-lg); }
+    .rules-cta-card h2 { margin: 0 0 var(--space-sm); border: none; padding: 0; }
+    .rules-cta-card p { margin: 0 0 var(--space-md); color: var(--color-text-secondary); }
+    .rules-button { display: inline-flex; align-items: center; padding: var(--space-sm) var(--space-lg); background: var(--color-accent-primary); color: var(--color-text-inverted); text-decoration: none; border-radius: var(--radius-md); font-weight: var(--font-weight-bold); }
+    .rules-button:hover { background: var(--color-accent-hover); }
+    @media (max-width: 600px) {
+      .card-type-list, .keyword-list { grid-template-columns: 1fr; }
+      .card-type-list dt, .keyword-list dt { margin-top: var(--space-sm); }
+    }
+  </style>
+</Layout>

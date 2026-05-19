@@ -1,0 +1,3 @@
+*.webp binary
+*.json.br binary
+* text=auto eol=lf

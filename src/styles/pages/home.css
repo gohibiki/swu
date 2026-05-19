@@ -1,0 +1,693 @@
+﻿/* Homepage layout â€” hub page targeting "disney swu", "swu cards",
+ * "swu deck builder", "swu decks". Sections (top to bottom):
+ *   1. Hero (text-on-left, fanned cards on right at desktop)
+ *   2. Quick Actions (2x2 grid with card-art backgrounds)
+ *   3. Spotlight: latest set (centered single column)
+ *   4. All Sets (stacked: header on top, grid below; set logos in tiles)
+ *   5. Recent Tournament Wins (full-width rows with mini card strip)
+ *   6. FAQ (2-col with feature card art on the side)
+ */
+
+/* Cap homepage content sections on wide monitors so rows don't sprawl.
+   Targets only .home-hero and <main> so the nav stays full-width.
+   Scoped to data-page="home" so other pages keep their edge-to-edge layouts. */
+body[data-page="home"] .home-hero,
+body[data-page="home"] main {
+  max-width: 1280px;
+  margin-inline: auto;
+}
+
+/* ===== Hero ===== */
+.home-hero {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-xl);
+  align-items: center;
+  padding: var(--space-2xl) 0 var(--space-xl);
+}
+
+@media (min-width: 768px) {
+  .home-hero {
+    grid-template-columns: 1.2fr 1fr;
+  }
+}
+
+/* Text centered within its column (H1 + intro). Cards in right column at desktop. */
+.home-hero-text {
+  text-align: center;
+}
+
+.home-hero-text h1 {
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  line-height: 1.1;
+  margin: 0 0 var(--space-lg);
+  color: var(--color-text-primary);
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.home-h1-line-1,
+.home-h1-line-2 {
+  display: block;
+}
+
+.home-h1-line-2 {
+  font-size: 0.7em;
+  color: var(--color-text-secondary);
+  font-weight: 800;
+  margin-top: 0.15em;
+  letter-spacing: 0;
+}
+
+.home-intro {
+  font-size: var(--font-size-lg);
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.home-intro a {
+  color: var(--color-accent-primary);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--transition-fast);
+}
+
+.home-intro a:hover {
+  border-bottom-color: var(--color-accent-primary);
+}
+
+/* Hero card collage â€” three cards fanned out */
+.home-hero-cards {
+  position: relative;
+  height: 380px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.home-hero-card {
+  position: absolute;
+  width: 220px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  transition: transform var(--transition-normal);
+}
+
+.home-hero-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.home-hero-card.pos-0 { transform: rotate(-6deg) translate(-90px, 0); z-index: 1; }
+.home-hero-card.pos-1 { transform: translate(0, -10px); z-index: 3; }
+.home-hero-card.pos-2 { transform: rotate(6deg) translate(90px, 0); z-index: 2; }
+
+.home-hero-card.pos-0:hover { transform: rotate(-6deg) translate(-90px, -8px) scale(1.03); }
+.home-hero-card.pos-1:hover { transform: translate(0, -18px) scale(1.03); }
+.home-hero-card.pos-2:hover { transform: rotate(6deg) translate(90px, -8px) scale(1.03); }
+
+@media (max-width: 767px) {
+  .home-hero-cards {
+    height: 280px;
+  }
+  .home-hero-card { width: 150px; }
+  .home-hero-card.pos-0 { transform: rotate(-6deg) translate(-60px, 0); }
+  .home-hero-card.pos-2 { transform: rotate(6deg) translate(60px, 0); }
+}
+
+/* ===== Section headers ===== */
+.home-section-sub {
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-lg);
+  font-size: var(--font-size-base);
+  max-width: 70ch;
+}
+
+/* Pill-style CTA used by spotlight, decks, etc. (no arrow â€” kept clean) */
+.home-cta {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--color-accent-primary);
+  color: var(--color-text-inverted);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-base);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.home-cta:hover {
+  background: var(--color-accent-hover);
+  transform: translateY(-1px);
+}
+
+/* ===== Quick Actions: 2x2 grid with card-art backgrounds ===== */
+.home-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-md);
+  margin: var(--space-xl) 0 var(--space-2xl);
+}
+
+@media (min-width: 720px) {
+  .home-actions {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-lg);
+  }
+}
+
+.home-action {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  min-height: 130px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.home-action:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-swu-gold);
+  background: rgba(211, 186, 132, 0.06);
+}
+
+.home-action-art {
+  flex-shrink: 0;
+  width: 200px;
+  overflow: hidden;
+  position: relative;
+}
+
+@media (max-width: 720px) {
+  .home-action-art {
+    width: 130px;
+  }
+}
+
+.home-action-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transition: transform var(--transition-normal);
+}
+
+.home-action:hover .home-action-art img {
+  transform: scale(1.05);
+}
+
+.home-action-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md) var(--space-lg);
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.home-action-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.1;
+}
+
+.home-action-meta {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+/* ===== Spotlight (latest set) â€” info LEFT, cards RIGHT at desktop ===== */
+.home-spotlight {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-xl);
+  margin: var(--space-2xl) 0;
+}
+
+.home-spotlight-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-md);
+}
+
+.home-spotlight-info .home-section-sub {
+  margin: 0;
+}
+
+.home-spotlight-logo-wrap {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.home-spotlight-logo {
+  display: block;
+  max-width: min(440px, 90%);
+  width: 100%;
+  height: auto;
+}
+
+.home-spotlight-cards {
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .home-spotlight {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+    gap: var(--space-2xl);
+    align-items: center;
+  }
+  /* Info column stays centered â€” user prefers centered text over left-aligned */
+}
+
+/* Generic card grid (used by spotlight) */
+.home-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-md);
+}
+
+@media (min-width: 768px) {
+  .home-card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  }
+}
+
+.home-card-tile {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: var(--color-text-primary);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: transform var(--transition-fast);
+}
+
+.home-card-tile:hover {
+  transform: translateY(-3px);
+}
+
+.home-card-tile img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.home-card-name {
+  font-size: var(--font-size-sm);
+  text-align: center;
+  margin-top: var(--space-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===== All sets â€” grid LEFT, info RIGHT at desktop (opposite of spotlight) ===== */
+.home-sets {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-xl);
+  margin: var(--space-2xl) 0;
+}
+
+.home-sets-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-md);
+}
+
+.home-sets-info h2 {
+  margin: 0;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+}
+
+.home-sets-info .home-section-sub {
+  margin: 0;
+}
+
+/* Mobile/tablet: show the title + intro + CTA above the grid.
+   DOM order is grid-then-info (so desktop puts grid on the left),
+   so we flip via flex order on small screens. */
+@media (max-width: 1023px) {
+  .home-sets-info {
+    order: -1;
+  }
+}
+
+@media (min-width: 1024px) {
+  .home-sets {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: var(--space-2xl);
+    align-items: center;
+  }
+  /* Info column stays centered, no sticky */
+}
+
+.home-sets-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-sm);
+}
+
+@media (min-width: 600px) {
+  .home-sets-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: var(--space-md);
+  }
+}
+
+/* Set tiles â€” transparent style, integrates with the dark page background */
+.home-set-tile {
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  text-decoration: none;
+  color: var(--color-text-primary);
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.home-set-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-swu-gold);
+  background: rgba(211, 186, 132, 0.06);
+}
+
+.home-set-art {
+  aspect-ratio: 5 / 3;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-set-art-logo {
+  width: auto;
+  max-width: 88%;
+  max-height: 80%;
+  height: auto;
+  object-fit: contain;
+  padding: var(--space-sm);
+  display: block;
+}
+
+/* No-logo tiles: text-only, more padding to fill the missing visual block */
+.home-set-tile-no-logo .home-set-info {
+  padding: var(--space-xl) var(--space-md);
+}
+
+.home-set-info {
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.home-set-code {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.home-set-name {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.home-set-count {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+/* ===== Recent Tournament Wins â€” list LEFT, info RIGHT at desktop ===== */
+.home-decks {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-xl);
+  margin: var(--space-2xl) 0;
+}
+
+.home-decks-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-md);
+}
+
+.home-decks-info h2 {
+  margin: 0;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+}
+
+.home-decks-info .home-section-sub {
+  margin: 0;
+}
+
+/* 4-card fan cluster â€” one card from each of the 4 most recent winning decks.
+   Borrows the visual language of .home-hero-cards but tighter and 4-up. */
+.home-decks-fan {
+  position: relative;
+  height: 280px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.home-decks-fan-card {
+  position: absolute;
+  width: 150px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  transition: transform var(--transition-normal);
+}
+
+.home-decks-fan-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.home-decks-fan-card.pos-0 { transform: rotate(-9deg) translate(-130px, 0); z-index: 1; }
+.home-decks-fan-card.pos-1 { transform: rotate(-3deg) translate(-44px, -8px); z-index: 3; }
+.home-decks-fan-card.pos-2 { transform: rotate(3deg)  translate(44px, -8px);  z-index: 4; }
+.home-decks-fan-card.pos-3 { transform: rotate(9deg)  translate(130px, 0);    z-index: 2; }
+
+.home-decks-fan-card.pos-0:hover { transform: rotate(-9deg) translate(-130px, -8px) scale(1.04); }
+.home-decks-fan-card.pos-1:hover { transform: rotate(-3deg) translate(-44px, -16px) scale(1.04); }
+.home-decks-fan-card.pos-2:hover { transform: rotate(3deg)  translate(44px, -16px)  scale(1.04); }
+.home-decks-fan-card.pos-3:hover { transform: rotate(9deg)  translate(130px, -8px)  scale(1.04); }
+
+@media (max-width: 720px) {
+  .home-decks-fan {
+    height: 220px;
+  }
+  .home-decks-fan-card { width: 110px; }
+  .home-decks-fan-card.pos-0 { transform: rotate(-9deg) translate(-90px, 0); }
+  .home-decks-fan-card.pos-1 { transform: rotate(-3deg) translate(-30px, -6px); }
+  .home-decks-fan-card.pos-2 { transform: rotate(3deg)  translate(30px, -6px); }
+  .home-decks-fan-card.pos-3 { transform: rotate(9deg)  translate(90px, 0); }
+}
+
+@media (min-width: 1024px) {
+  .home-decks {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: var(--space-2xl);
+    align-items: center;
+  }
+  /* Info column stays centered, no sticky */
+}
+
+.home-decks-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* Deck row â€” transparent style with ink-color stripe on the left */
+.home-deck-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  color: var(--color-text-primary);
+  transition: border-color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.home-deck-row:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-swu-gold);
+  background: rgba(211, 186, 132, 0.06);
+}
+
+.home-deck-inks {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.home-deck-ink {
+  width: 32px;
+  height: 32px;
+  display: block;
+}
+
+.home-deck-row-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.home-deck-name {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.home-deck-submeta {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+/* ===== FAQ â€” 2-col with feature card art on the side ===== */
+.home-faq {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-xl);
+  margin: var(--space-2xl) 0;
+  align-items: center;
+}
+
+@media (min-width: 1024px) {
+  .home-faq {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: var(--space-2xl);
+  }
+}
+
+.home-faq-content h2 {
+  margin: 0 0 var(--space-xs);
+  font-size: clamp(1.5rem, 3vw, 2rem);
+}
+
+.home-faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.home-faq-item {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md) var(--space-lg);
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.home-faq-item:hover {
+  border-color: var(--color-swu-gold);
+  background: rgba(211, 186, 132, 0.06);
+}
+
+.home-faq-item[open] {
+  border-color: var(--color-swu-gold);
+}
+
+.home-faq-item summary {
+  cursor: pointer;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  list-style: revert;
+  line-height: 1.3;
+}
+
+.home-faq-item summary:hover {
+  color: var(--color-swu-gold);
+}
+
+.home-faq-item p {
+  margin: var(--space-md) 0 var(--space-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  font-size: var(--font-size-base);
+}
+
+.home-faq-readmore {
+  display: inline-block;
+  margin-top: var(--space-xs);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-accent-primary);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--transition-fast);
+}
+
+.home-faq-readmore:hover {
+  border-bottom-color: var(--color-accent-primary);
+  color: var(--color-swu-gold);
+}
+
+.home-faq-art {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.home-faq-art img {
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  transform: rotate(3deg);
+  transition: transform var(--transition-normal);
+}
+
+.home-faq-art img:hover {
+  transform: rotate(0deg) scale(1.03);
+}
+
+@media (max-width: 1023px) {
+  .home-faq-art {
+    order: -1;  /* Show featured card above FAQ on mobile/tablet */
+  }
+  .home-faq-art img {
+    max-width: 240px;
+    transform: rotate(-3deg);
+  }
+}

@@ -1,0 +1,52 @@
+node_modules
+dist
+.astro
+
+# Decompressed data — regenerated at build time from data/*.json.br
+public/data/
+
+# Local env
+.env
+.env.local
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+npm-debug.log*
+*.log
+
+# Brand asset originals (106MB) — source files for scripts/process-*-logos.js.
+# Originals are downloaded from the Ravensburger brand portal; only the
+# optimized WebP outputs in public/{set,ink}-logos/ are tracked.
+/source/
+
+# Working files dropped during research / setup
+/*.zip
+/*.tif
+/*.htm
+/*.html
+/*_files/
+
+# IndexNow cache — local-only memo of which URLs have been submitted
+scripts/.indexnow-cache.json
+
+# tcgtopdecks raw HTML dump + locally-cloned nodriver-cf-verify fallback
+scripts/scrape-tcgtopdecks/_raw/
+scripts/scrape-tcgtopdecks/nodriver_cf_verify/
+_cfbypass/
+
+# Working files
+/comprehensiverules_en.pdf
+/straczynski.zip
+
+# SEO research input — analytics export, not site source
+/KeywordStats_*.csv
+/vecteezy_*.svg
+
+# Working font sources (extracted to public/fonts/eurostile/)
+/Eurostile Round Extended.zip
+/eurostile-round.zip

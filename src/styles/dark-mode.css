@@ -1,0 +1,46 @@
+/*
+ * Component-specific overrides for legacy hardcoded colors.
+ * Site is dark-mode only — these rules apply unconditionally.
+ *
+ * TODO: Refactor components to use CSS variables and remove this file.
+ */
+
+/* Card-specific overrides — keep CSS variables for consistency */
+.card-effect {
+  background: var(--color-blue-light);
+}
+
+.card-trigger {
+  background: var(--color-warning-bg);
+}
+
+.card-trigger strong {
+  color: var(--color-warning);
+}
+
+/* Modal-specific overrides */
+.modal-content {
+  background-color: var(--color-bg-secondary);
+}
+
+.modal-effect {
+  background: var(--color-blue-light);
+}
+
+.modal-effect h3 {
+  color: var(--color-blue-dark);
+}
+
+.modal-trigger {
+  background: var(--color-warning-bg);
+}
+
+.modal-trigger h3 {
+  color: var(--color-warning-dark);
+}
+
+/* Card overrides */
+.card {
+  background: var(--color-bg-secondary);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}

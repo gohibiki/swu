@@ -1,0 +1,1000 @@
+﻿---
+import Layout from '../layouts/Layout.astro';
+import Navigation from '../components/Navigation.astro';
+import { loadCardData } from '../utils/loadCardData.js';
+import { loadDecklists } from '../utils/loadDecklists.js';
+import { loadSets, getLatestMainSet } from '../utils/setData.js';
+import { getImageSrcSet } from '../utils/helpers.js';
+import { faqs as faqEntries } from '../data/faqs.js';
+
+interface Card { id: string; name?: string; slug?: string; set?: string; rarity?: string; color?: string; }
+
+const { cards } = await loadCardData() as { cards: Card[] };
+const { sets } = loadSets();
+const { decks } = await loadDecklists() as { decks: any[] };
+
+// Dedupe: count base cards only (exclude alt-art variants like ID_p1).
+const uniqueCardIds = new Set<string>();
+for (const c of cards) {
+  if (!c.id) continue;
+  uniqueCardIds.add(c.id.split('_')[0]);
+}
+const totalCards = uniqueCardIds.size;
+const totalSets = sets.length;
+
+const latestSet = getLatestMainSet();
+const latestSetId = latestSet?.id || null;
+
+const latestCards = cards.filter(c => c.set === latestSetId && !c.id.includes('_'));
+const spotlight = (
+  latestCards.filter(c => c.rarity === 'LR')
+    .concat(latestCards.filter(c => c.rarity === 'SR'))
+    .concat(latestCards.filter(c => c.rarity === 'R'))
+).slice(0, 8);
+
+const lcpCard = spotlight[0];
+const lcpSrcSet = lcpCard ? getImageSrcSet(lcpCard) : null;
+
+// Top decks â€” most-recent 6 with at least one image-able card.
+const topDecks = decks.slice(0, 6).map((d: any, idx: number) => {
+  // Same hero pick as /decklists for cross-page visual consistency:
+  // rarest Units first, qty as tiebreak, cost as final tiebreak.
+  // Resources/Pilots/Commands/Bases excluded â€” Units (Mobile Suits)
+  // are the most recognizable cards.
+  const order = ['LR', 'SR', 'R', 'U', 'C', 'P'];
+  const heroes = d.cards
+    .filter((c: any) => c.id && (c.type || '').toLowerCase() === 'unit')
+    .sort((a: any, b: any) => {
+      const rDiff = order.indexOf(a.rarity || 'C') - order.indexOf(b.rarity || 'C');
+      if (rDiff !== 0) return rDiff;
+      if ((b.qty ?? 0) !== (a.qty ?? 0)) return (b.qty ?? 0) - (a.qty ?? 0);
+      return (b.cost ?? -1) - (a.cost ?? -1);
+    })
+    .slice(0, 2);
+  return {
+    idx,
+    deckName: d.deckName || d.deckProfile || '-',
+    author: d.author || '',
+    date: d.date,
+    set: d.set,
+    placement: d.placement || '',
+    colors: d.colors as string[],
+    heroes
+  };
+});
+
+const description = `Star Wars Unlimited database with ${totalCards.toLocaleString()} Star Wars Unlimited (SWU) cards from ${totalSets} sets, tournament decklists, and the comprehensive rules.`;
+
+// Release roadmap â€” sourced live from TCGCSV's group `publishedOn` dates
+// (the same data the daily fetch-data pulls). New sets appear as soon as
+// TCGplayer lists them, which usually precedes Fantasy Flight Games's street date by
+// 1-3 months. No more hand-coded dates to babysit.
+//
+// `manualUpcoming`: escape hatch for sets that Fantasy Flight Games has announced but
+// TCGplayer hasn't listed yet. Empty by default â€” only populate if you
+// want to surface a set ahead of TCGplayer's catalog.
+const KIND_LABEL: Record<string, string> = {
+  main:    'Booster',
+  extra:   'Extra Booster',
+  starter: 'Starter Deck',
+  promo:   'Promo',
+  special: 'Special',
+};
+const manualUpcoming: { code: string; name: string; date: string; kind: keyof typeof KIND_LABEL }[] = [
+  // Example: { code: 'GD05', name: 'Freedom Ascension', date: '2026-07-24', kind: 'main' }
+];
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+const todayMs = Date.now();
+const SOON_DAYS = 60;
+
+// Pull only product-shipping sets (boosters / extras / starters). Promos
+// and tokens don't belong on a release roadmap â€” they ship rolling and
+// would clutter the timeline.
+const ROADMAP_KINDS = new Set(['main', 'extra', 'starter']);
+const liveRoadmap = (sets as any[])
+  .filter((s: any) => ROADMAP_KINDS.has(s.kind) && s.release)
+  .map((s: any) => ({
+    code: s.id as string,
+    name: (s.name as string).replace(/^Starter Deck \d+:\s*/, ''),
+    date: s.release as string,
+    kind: s.kind as keyof typeof KIND_LABEL,
+  }));
+
+// Live data wins on `code` collision â€” once TCGplayer lists a set, the
+// manual entry for it becomes redundant and is dropped automatically.
+const liveCodes = new Set(liveRoadmap.map(r => r.code));
+const filteredManual = manualUpcoming.filter(r => !liveCodes.has(r.code));
+
+const roadmapAll = [...liveRoadmap, ...filteredManual]
+  .sort((a, b) => a.date.localeCompare(b.date))
+  .map(item => {
+    const ms = new Date(item.date).getTime();
+    const daysFromNow = (ms - todayMs) / 86_400_000;
+    let status: 'released' | 'upcoming' | 'announced';
+    if (daysFromNow < 0) status = 'released';
+    else if (daysFromNow <= SOON_DAYS) status = 'upcoming';
+    else status = 'announced';
+    return { ...item, status };
+  });
+
+// Show the 3 most recent past releases + everything still upcoming, so
+// the section stays focused on "what's next" without dropping all history.
+const released = roadmapAll.filter(r => r.status === 'released').slice(-3);
+const future = roadmapAll.filter(r => r.status !== 'released');
+const roadmap = [...released, ...future];
+
+// FAQ â€” short, direct answers to high-volume search queries.
+// Source: KeywordStats CSV (top: swu tcg deck builder, swu tcg online,
+// swu tcg meta, swu tcg decks, swu tcg card list) + 2026 Fantasy Flight Games
+// release schedule research.
+const faqs = [
+  {
+    q: "What is the Star Wars Unlimited?",
+    a: "The Star Wars Unlimited (SWU) is a two-player trading card game by Fantasy Flight Games, launched in 2024. Each player builds a 50-card main deck plus a 10-card resource deck and battles with Mobile Suits, Pilots, Bases, and Commands. The game uses an AP/HP combat system with a 6-card shield zone: knock all six shields out and land one more point of damage to win."
+  },
+  {
+    q: "How do I build a deck?",
+    a: "A legal deck is exactly 50 cards (Units, Pilots, Commands, and Bases) plus a separate 10-card resource deck. You may use one or two of the four colors (Blue, Green, Red, White) and a maximum of four copies of any card sharing the same card number. Resource cards have no copy limit in the resource deck. The full rules are on the /how-to-play page."
+  },
+  {
+    q: "Where can I find a Star Wars Unlimited deck builder?",
+    a: "A drag-and-drop builder is in development on this site. Until it ships, the /database page lets you filter all cards by color, type, cost, AP/HP, level, rarity, and keyword, enough to draft a list by hand."
+  },
+  {
+    q: "Where do I find competitive decklists?",
+    a: "Decklist scraping is being wired up. Community lists from Fantasy Flight Games's Newtype Challenge events, Store Championships, and Regionals will populate the /decklists page once the pipeline lands. For now, Fantasy Flight Games's own event hub at starwarsunlimited.com publishes top-cut lists from major tournaments."
+  },
+  {
+    q: "Can I play Star Wars Unlimited online?",
+    a: "There is no official Fantasy Flight Games-hosted online client as of mid-2026. Most digital play is community-run. Tabletop Simulator setups are the most active option, and the Star Wars Unlimited subreddit and Discord track the latest mod links. The official Fantasy Flight Games TCG+ platform handles event registration and store qualifiers but not digital play."
+  },
+  {
+    q: "What's the latest set?",
+    a: `The most recent set indexed in this database is ${latestSet?.name || 'the current main release'} (${latestSetId || ''}). Fantasy Flight Games's 2026 schedule continues with Generation Pulse [ST10] and Eternal Nexus [EB01] in June, then Freedom Ascension [GD05] in July and Stardust Trails [GD06] in October. Check the official products page for region-specific dates.`
+  },
+  {
+    q: "Where can I buy Star Wars Unlimited singles and sealed product?",
+    a: "Sealed product (boosters and starter decks) is sold through Fantasy Flight Games TCG+ authorized retailers and most local game stores carrying Fantasy Flight Games titles. Singles are widely available on TCGPlayer, which added the game to its catalog in 2025. Card pages on this site link directly to TCGPlayer with affiliate tagging, and purchases support the site at no extra cost to you."
+  },
+  {
+    q: "What deck should a beginner buy?",
+    a: "Start with the newest legal Starter Deck from your region rather than building from boosters. Fantasy Flight Games runs a dedicated Starter Deck Battle Event throughout 2026 specifically for new-player on-ramps, so a starter is the most supported entry point. The Generation Pulse [ST10] starter line is the latest scheduled wave."
+  },
+  {
+    q: "What does AP, HP, and Lv mean on a card?",
+    a: "AP is attack points (offensive strength), HP is hit points (defensive strength, when it reaches zero the Unit is destroyed), and Lv is the required level to deploy a Unit. Some Units also have a Link condition: pair them with a matching Pilot and they can attack the turn they deploy. See /how-to-play for full combat math."
+  },
+  {
+    q: "What are the keyword effects?",
+    a: "The seven core keyword effects from comprehensive rules v1.6.0 are: <Repair X> (heal X HP at end of turn), <Breach X> (deal X damage to top shield when destroying an enemy Unit), <Support X> (rest to give a friendly Unit AP+X), <Blocker> (redirect attacks to this Unit), <First Strike> (deal damage before the defender), <High-Maneuver> (enemies can't activate <Blocker>), and <Suppression> (damage two shields at once). Each is filterable on the /database page."
+  }
+];
+---
+
+<Layout
+  title="Star Wars Unlimited Database - Cards, Decks & Rules"
+  description={description}
+  canonical="https://www.swutcg.one/"
+  pageId="home"
+>
+  <Fragment slot="head">
+    {lcpSrcSet && (
+      <link
+        rel="preload"
+        as="image"
+        href={lcpSrcSet.src}
+        imagesrcset={lcpSrcSet.srcset}
+        imagesizes="360px"
+        fetchpriority="high"
+      />
+    )}
+  </Fragment>
+
+  <script is:inline type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "SWUTCG.one",
+    "url": "https://www.swutcg.one/",
+    "description": "Star Wars Unlimited database with card search, rules, and decklists.",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://www.swutcg.one/database?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
+  })} />
+
+  <script is:inline type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqs.map(f => ({
+      "@type": "Question",
+      "name": f.q,
+      "acceptedAnswer": { "@type": "Answer", "text": f.a }
+    }))
+  })} />
+
+  <Navigation activePage="home" />
+
+  <!-- Starfield + nebula backdrop (homepage only). The site-wide
+       .page-bg div is hidden via CSS below so this becomes the bg. -->
+  <canvas id="starfield" aria-hidden="true"></canvas>
+  <div class="nebula" aria-hidden="true"></div>
+
+  <main class="home">
+    <header class="hero">
+      <div class="hero-tag">
+        <span class="hero-tag-dot"></span>
+        <span>Daily sync Â· {totalCards.toLocaleString()} cards indexed</span>
+      </div>
+      <h1 class="hero-title">Star Wars Unlimited Database</h1>
+      <p class="hero-lede">
+        <strong>Star Wars Unlimited database</strong> with <strong>{totalCards.toLocaleString()} cards</strong> across <strong>{totalSets}</strong> sets. Search every card, build a deck, or study tournament decklists.
+      </p>
+      <form class="hero-search" action="/database" method="get" role="search">
+        <input
+          type="search"
+          name="q"
+          class="hero-search-input"
+          placeholder="Search by name, trait, or keyword, e.g. Char's Zaku"
+          aria-label="Search the card database"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button type="submit" class="hero-search-btn" aria-label="Search">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+            <circle cx="11" cy="11" r="7"></circle>
+            <line x1="16" y1="16" x2="21" y2="21"></line>
+          </svg>
+          <span>Search</span>
+        </button>
+      </form>
+      <div class="hero-stats">
+        <div class="hero-stat"><span class="hero-stat-num">{totalCards.toLocaleString()}</span><span class="hero-stat-label">Cards indexed</span></div>
+        <div class="hero-stat-divider" aria-hidden="true"></div>
+        <div class="hero-stat"><span class="hero-stat-num">{totalSets}</span><span class="hero-stat-label">Sets tracked</span></div>
+        <div class="hero-stat-divider" aria-hidden="true"></div>
+        <div class="hero-stat"><span class="hero-stat-num">{decks.length}</span><span class="hero-stat-label">Decklists</span></div>
+      </div>
+    </header>
+
+    {spotlight.length > 0 && latestSet && (
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <div class="section-eyebrow">// Latest drop</div>
+            <h2 class="section-title">New booster</h2>
+          </div>
+          <a href={`/set/${latestSet.slug || latestSetId}`} class="section-link">All sets</a>
+        </div>
+        <div class="drop" data-set-code={latestSetId}>
+          <div class="drop-info">
+            <div class="drop-meta">
+              <span class="drop-pill">Live</span>
+              {latestSet.release && (
+                <span class="drop-date">Released {fmtDate(latestSet.release)}</span>
+              )}
+            </div>
+            <h3 class="drop-title">{latestSet.name}</h3>
+            <p class="drop-desc">
+              {spotlight.length} highlighted printings from the latest Fantasy Flight Games release. Includes the new LR, SR, and R units defining the current meta.
+            </p>
+            <a href={`/set/${latestSet.slug || latestSetId}`} class="drop-cta">Browse {latestSetId}</a>
+          </div>
+          {(() => {
+            const picks = spotlight.slice(0, 5);
+            const hero = picks[0];
+            const smalls = picks.slice(1, 5);
+            return (
+              <div class="drop-cards">
+                {hero && (() => {
+                  const ss = getImageSrcSet(hero);
+                  const altText = `${hero.name} (${hero.id})`;
+                  return (
+                    <a href={`/card/${hero.slug || hero.id}`} class="drop-card drop-card-hero" aria-label={altText}>
+                      {ss && (
+                        <img src={ss.src} srcset={ss.srcset} sizes="360px" alt={altText} width="350" height="490" loading="eager" fetchpriority="high" decoding="async" />
+                      )}
+                    </a>
+                  );
+                })()}
+                {smalls.map(card => {
+                  const ss = getImageSrcSet(card);
+                  const altText = `${card.name} (${card.id})`;
+                  return (
+                    <a href={`/card/${card.slug || card.id}`} class="drop-card drop-card-small" aria-label={altText}>
+                      {ss && (
+                        <img src={ss.src} srcset={ss.srcset} sizes="180px" alt={altText} width="350" height="490" loading="lazy" decoding="async" />
+                      )}
+                    </a>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      </section>
+    )}
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <div class="section-eyebrow">// 2026 Schedule</div>
+          <h2 class="section-title">Release timeline</h2>
+        </div>
+      </div>
+      <div class="timeline">
+        <div class="timeline-line" aria-hidden="true"></div>
+        <div class="timeline-sweep" aria-hidden="true"></div>
+        <div class="timeline-track" style={`--tl-count: ${roadmap.length};`}>
+          {roadmap.map(item => (
+            <div class={`tl-node tl-${item.status}`}>
+              <div class="tl-dot" aria-hidden="true"></div>
+              <div class="tl-code">{item.code}</div>
+              <div class="tl-name">{item.name}</div>
+              <div class="tl-date">{fmtDate(item.date)}</div>
+              <span class="tl-tag">{item.status === 'released' ? 'Released' : item.status === 'upcoming' ? 'Live now' : 'Announced'}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    {topDecks.length > 0 && (
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <div class="section-eyebrow">// Tournament meta</div>
+            <h2 class="section-title">Top decks this week</h2>
+          </div>
+          <a href="/decklists" class="section-link">All decklists</a>
+        </div>
+        <div class="decks-grid">
+          {topDecks.slice(0, 4).map((deck: any) => {
+            const place = (deck.placement || '').replace(/\s*place\s*$/i, '').trim();
+            return (
+              <a href={`/decklists#deck-${deck.idx}`} class="deck-card">
+                <div class="deck-card-head">
+                  <span>{deck.set} Â· {fmtDate(deck.date)}</span>
+                  {place && <span class="deck-card-place">{place}</span>}
+                </div>
+                <div class="deck-card-thumbs">
+                  {deck.heroes.map((h: any) => {
+                    const ss = getImageSrcSet({ id: h.id });
+                    return ss ? (
+                      <img src={ss.src} srcset={ss.srcset} sizes="100px" width="100" height="140" alt={h.name || h.id} loading="lazy" decoding="async" />
+                    ) : null;
+                  })}
+                </div>
+                <h3 class="deck-card-name">{deck.deckName}</h3>
+              </a>
+            );
+          })}
+        </div>
+      </section>
+    )}
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <div class="section-eyebrow">// What's here</div>
+          <h2 class="section-title">Modules</h2>
+        </div>
+      </div>
+      <div class="features-grid">
+        <a href="/how-to-play" class="feature-tile">
+          <div class="feature-tile-eyebrow">// 01</div>
+          <h3 class="feature-tile-title">How to Play</h3>
+          <p class="feature-tile-desc">Five-minute walkthrough of the rules, turn flow, and keyword effects.</p>
+        </a>
+        <a href="/database" class="feature-tile">
+          <div class="feature-tile-eyebrow">// 02</div>
+          <h3 class="feature-tile-title">Card Database</h3>
+          <p class="feature-tile-desc">Filter every card by color, type, cost, AP/HP, level, rarity, or keyword. {totalCards.toLocaleString()} entries.</p>
+        </a>
+        <a href="/builder" class="feature-tile">
+          <div class="feature-tile-eyebrow">// 03</div>
+          <h3 class="feature-tile-title">Deck Builder</h3>
+          <p class="feature-tile-desc">Build with the full card pool. Import, export, share via URL, and price the whole deck on TCGplayer.</p>
+        </a>
+        <a href="/decklists" class="feature-tile">
+          <div class="feature-tile-eyebrow">// 04</div>
+          <h3 class="feature-tile-title">Decklists</h3>
+          <p class="feature-tile-desc">Tournament-winning lists with the full 50-card breakdown. Open any in the builder.</p>
+        </a>
+      </div>
+    </section>
+
+    <section class="section faq" id="faq">
+      <div class="section-head">
+        <div>
+          <div class="section-eyebrow">// Knowledge base</div>
+          <h2 class="section-title">Frequently asked</h2>
+        </div>
+      </div>
+      <div class="faq-list">
+        {faqs.map((f, i) => {
+          const detail = faqEntries.find((e: any) => e.q === f.q && e.long);
+          return (
+            <details class="faq-item" open={i === 0}>
+              <summary>{f.q}</summary>
+              <p set:html={f.a}></p>
+              {detail && (
+                <p class="faq-read-more">
+                  <a href={`/faq/${detail.slug}`}>Read the full guide</a>
+                </p>
+              )}
+            </details>
+          );
+        })}
+      </div>
+    </section>
+  </main>
+
+  <!-- Starfield: 3 parallax layers, gentle drift, optional twinkle +
+       shooting stars. Honors prefers-reduced-motion. -->
+  <script is:inline>
+    (() => {
+      const canvas = document.getElementById('starfield');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      let w, h, dpr;
+      let stars = [];
+      let shootingStars = [];
+      let lastShoot = 0;
+      const settings = { density: 1, twinkle: true, shooting: true, drift: 0.04 };
+
+      function resize() {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        w = window.innerWidth;
+        h = window.innerHeight;
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        seed();
+      }
+      function seed() {
+        stars = [];
+        const count = Math.floor((w * h / 6000) * settings.density);
+        for (let i = 0; i < count; i++) {
+          const layer = Math.random();
+          const z = layer < 0.6 ? 0.3 : (layer < 0.9 ? 0.6 : 1.0);
+          stars.push({
+            x: Math.random() * w, y: Math.random() * h,
+            r: (0.3 + Math.random() * 1.4) * z, z,
+            phase: Math.random() * Math.PI * 2,
+            speed: 0.5 + Math.random() * 2,
+            hue: Math.random() < 0.12 ? (Math.random() < 0.5 ? '#FFD9A8' : '#A8C8FF') : '#FFFFFF',
+          });
+        }
+      }
+      function spawnShooting() {
+        const fromTop = Math.random() < 0.5;
+        const x = fromTop ? Math.random() * w : -50;
+        const y = fromTop ? -50 : Math.random() * h * 0.5;
+        shootingStars.push({
+          x, y, vx: 6 + Math.random() * 4, vy: 2.5 + Math.random() * 1.5,
+          life: 0, maxLife: 90 + Math.random() * 40,
+        });
+      }
+      let t0 = performance.now();
+      let rafId = 0;
+      function frame(now) {
+        const dt = Math.min(50, now - t0);
+        t0 = now;
+        ctx.clearRect(0, 0, w, h);
+        for (const s of stars) {
+          s.x += settings.drift * s.z * (dt / 16);
+          s.y += settings.drift * 0.3 * s.z * (dt / 16);
+          if (s.x > w + 5) s.x = -5;
+          if (s.y > h + 5) s.y = -5;
+          s.phase += 0.002 * s.speed * dt;
+          const tw = settings.twinkle ? (0.55 + 0.45 * Math.sin(s.phase)) : 0.9;
+          const alpha = 0.35 + 0.55 * tw * s.z;
+          ctx.beginPath();
+          ctx.fillStyle = s.hue;
+          ctx.globalAlpha = alpha;
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fill();
+          if (s.r > 1.2) {
+            ctx.globalAlpha = alpha * 0.18;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.r * 3, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        ctx.globalAlpha = 1;
+        if (settings.shooting && now - lastShoot > 4500 + Math.random() * 4000) {
+          spawnShooting();
+          lastShoot = now;
+        }
+        for (let i = shootingStars.length - 1; i >= 0; i--) {
+          const s = shootingStars[i];
+          s.x += s.vx; s.y += s.vy; s.life++;
+          const fade = 1 - (s.life / s.maxLife);
+          if (fade <= 0) { shootingStars.splice(i, 1); continue; }
+          const tailLen = 80;
+          const grad = ctx.createLinearGradient(s.x, s.y, s.x - s.vx * tailLen / 6, s.y - s.vy * tailLen / 6);
+          grad.addColorStop(0, `rgba(255,255,255,${0.9 * fade})`);
+          grad.addColorStop(0.5, `rgba(241,196,74,${0.4 * fade})`);
+          grad.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = 1.8;
+          ctx.beginPath();
+          ctx.moveTo(s.x, s.y);
+          ctx.lineTo(s.x - s.vx * tailLen / 6, s.y - s.vy * tailLen / 6);
+          ctx.stroke();
+          ctx.fillStyle = `rgba(255,255,255,${fade})`;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, 1.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        rafId = requestAnimationFrame(frame);
+      }
+      function start() {
+        if (rafId) return;
+        t0 = performance.now();
+        rafId = requestAnimationFrame(frame);
+      }
+      function stop() {
+        if (!rafId) return;
+        cancelAnimationFrame(rafId);
+        rafId = 0;
+      }
+      window.addEventListener('resize', resize);
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) stop(); else start();
+      });
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        settings.twinkle = false;
+        settings.shooting = false;
+        settings.drift = 0;
+      }
+      // Defer the first layout read (window.innerWidth) until after the
+      // browser's natural first paint, so the LCP isn't blocked by a
+      // synchronous forced reflow. Canvas warms up ~1 frame later â€”
+      // imperceptible, but Lighthouse stops flagging this site.
+      const boot = () => { resize(); start(); };
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(boot, { timeout: 500 });
+      } else {
+        requestAnimationFrame(boot);
+      }
+    })();
+  </script>
+
+  <style is:global>
+    /* Homepage uses the starfield canvas as its backdrop, so hide the
+       site-wide solid .page-bg div and let the canvas show through. */
+    body[data-page="home"] .page-bg { display: none; }
+    body[data-page="home"] { background: #05060A; }
+
+    /* Starfield + nebula â€” fixed, behind everything */
+    #starfield {
+      position: fixed; inset: 0; width: 100%; height: 100%;
+      z-index: 0; pointer-events: none;
+    }
+    .nebula {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 800px 600px at 18% 24%, rgba(53, 92, 154, 0.22), transparent 60%),
+        radial-gradient(ellipse 700px 500px at 85% 65%, rgba(126, 79, 182, 0.16), transparent 60%),
+        radial-gradient(ellipse 1000px 700px at 50% 95%, rgba(241, 196, 74, 0.08), transparent 65%);
+    }
+    /* Content sits above the starfield. .main-nav is excluded because
+       on mobile it's position:fixed at the bottom (z-index:100) and
+       this override would force it back into static-flow at the top. */
+    body[data-page="home"] .container,
+    body[data-page="home"] .home,
+    body[data-page="home"] header { position: relative; z-index: 2; }
+    @media (min-width: 768px) {
+      body[data-page="home"] .main-nav { position: relative; z-index: 2; }
+    }
+
+    .home { max-width: 1240px; margin: 0 auto; padding: 0 var(--space-md) var(--space-2xl); }
+
+    /* === Hero === */
+    .hero {
+      text-align: center; position: relative;
+      /* Fill the viewport on first load so the whole section is in view
+         without scrolling. 80px â‰ˆ nav height; tweak if the nav grows.
+         Extra bottom padding offsets the top nav so the hero is
+         optically centered in the full viewport, not just below it. */
+      min-height: calc(100svh - 80px);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 32px 0 112px;
+    }
+    @media (max-width: 767px) {
+      /* On mobile the nav is bottom-fixed â€” min-height already excludes it,
+         so symmetric padding centers correctly. */
+      .hero { min-height: calc(100svh - 64px); padding: 24px 0; }
+    }
+    .hero-tag {
+      display: inline-flex; align-items: center; gap: 12px;
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--color-swu-yellow);
+      margin-bottom: 24px; padding: 6px 14px;
+      border: 1px solid rgba(241,196,74,0.3); border-radius: 999px;
+      background: rgba(241,196,74,0.05);
+    }
+    .hero-tag-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--color-swu-yellow);
+      box-shadow: 0 0 8px var(--color-swu-yellow);
+      animation: heroTagBlink 2s ease-in-out infinite;
+    }
+    @keyframes heroTagBlink { 0%, 70%, 100% { opacity: 1; } 80%, 90% { opacity: .15; } }
+
+    .hero-title {
+      font-family: 'Eurostile Heading', 'Eurostile', 'Roboto', system-ui, sans-serif;
+      font-weight: 700;
+      font-size: clamp(26px, 3.4vw, 42px);
+      line-height: 1.05; letter-spacing: 0;
+      margin: 0 0 20px; text-transform: uppercase; text-wrap: balance;
+    }
+    .hero-glow { color: var(--color-swu-yellow); text-shadow: 0 0 32px rgba(241,196,74,0.4); }
+
+    .hero-lede {
+      color: var(--color-text-secondary);
+      font-size: 17px; max-width: 64ch; line-height: 1.55;
+      margin: 0 auto 32px;
+    }
+    .hero-lede strong { color: var(--color-text-primary); font-weight: 700; }
+    .hero-lede a { color: var(--color-swu-yellow); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color .15s; }
+    .hero-lede a:hover { border-bottom-color: var(--color-swu-yellow); }
+
+    /* Hero search â€” backdrop-blurred input + accent button */
+    .hero-search {
+      display: flex; width: 100%; max-width: 760px; margin: 0 auto;
+      border: 1px solid var(--color-border-light);
+      background: rgba(10,12,18,0.7);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      border-radius: var(--radius-md);
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .hero-search:focus-within {
+      border-color: var(--color-swu-yellow);
+      box-shadow: 0 0 0 3px rgba(241,196,74,0.15), 0 0 40px rgba(241,196,74,0.15);
+    }
+    .hero-search-input {
+      flex: 1; min-width: 0; background: transparent; border: 0; outline: 0;
+      padding: 12px 16px; color: var(--color-text-primary);
+      font-family: var(--font-family-primary); font-weight: 500; font-size: 15px;
+    }
+    .hero-search-input::placeholder { color: var(--color-text-tertiary); }
+    .hero-search-btn {
+      background: var(--color-swu-yellow); color: var(--color-text-inverted);
+      border: 0; padding: 0 22px; cursor: pointer;
+      font-family: 'Eurostile Heading', 'Eurostile', system-ui, sans-serif;
+      font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.14em;
+      display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0;
+      transition: background-color .15s;
+    }
+    .hero-search-btn:hover { background: var(--color-swu-yellow-hi); }
+
+    /* Hero stat row â€” hairline-divided */
+    .hero-stats {
+      display: flex; gap: 40px; margin-top: 40px;
+      justify-content: center; flex-wrap: wrap;
+    }
+    .hero-stat { text-align: center; }
+    .hero-stat-num {
+      display: block;
+      font-family: 'Eurostile Heading', 'Eurostile', system-ui, sans-serif;
+      font-weight: 700; font-size: 32px; line-height: 1;
+      color: var(--color-text-primary);
+    }
+    .hero-stat-label {
+      display: block; margin-top: 10px;
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--color-text-tertiary);
+    }
+    .hero-stat-divider {
+      width: 1px;
+      background: linear-gradient(180deg, transparent, var(--color-border-light), transparent);
+    }
+    @media (max-width: 600px) { .hero-stat-divider { display: none; } .hero-stats { gap: 28px; } }
+
+    /* === Section heads (eyebrow + title + optional link) === */
+    .home .section { margin: 80px 0; }
+    @media (max-width: 767px) { .home .section { margin: 56px 0; } }
+    .home .section-head {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      gap: 24px; flex-wrap: wrap;
+      margin-bottom: 32px; padding-bottom: 16px;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .home .section-eyebrow {
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--color-swu-yellow);
+    }
+    .home .section-title {
+      font-family: 'Eurostile Heading', 'Eurostile', system-ui, sans-serif;
+      font-weight: 700; font-size: clamp(28px, 4vw, 38px);
+      text-transform: uppercase; letter-spacing: 0.01em; line-height: 1;
+      margin: 8px 0 0;
+    }
+    .home .section-link {
+      font-family: 'Eurostile Heading', 'Eurostile', system-ui, sans-serif;
+      font-size: 13px; text-transform: uppercase; letter-spacing: 0.14em;
+      color: var(--color-text-secondary); font-weight: 600;
+      padding-bottom: 4px; transition: color .15s;
+    }
+    .home .section-link:hover { color: var(--color-swu-yellow); }
+
+    /* === Set drop spotlight === */
+    .drop {
+      position: relative;
+      display: grid; grid-template-columns: 1.2fr 1fr;
+      gap: 40px; align-items: center;
+      padding: 24px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      background: linear-gradient(135deg, rgba(53, 92, 154, 0.08), transparent 60%);
+      overflow: hidden;
+    }
+    @media (max-width: 920px) { .drop { grid-template-columns: 1fr; padding: 16px; } }
+    .drop::before {
+      content: attr(data-set-code);
+      position: absolute; top: -22px; right: -8px;
+      font-family: 'Eurostile Heading', 'Eurostile', system-ui, sans-serif;
+      font-weight: 700;
+      font-size: clamp(120px, 22vw, 280px);
+      color: rgba(241, 196, 74, 0.05);
+      line-height: 1; letter-spacing: -0.04em;
+      pointer-events: none;
+    }
+    .drop-info { position: relative; z-index: 1; padding: 16px 8px 16px 24px; }
+    @media (max-width: 920px) { .drop-info { padding: 16px; order: 2; } }
+    .drop-meta {
+      display: flex; gap: 12px; align-items: center; margin-bottom: 20px;
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    }
+    .drop-pill {
+      padding: 4px 10px; background: var(--color-swu-yellow); color: var(--color-text-inverted);
+      border-radius: 999px; font-weight: 700;
+    }
+    .drop-date { color: var(--color-text-tertiary); }
+    .drop-title {
+      font-family: 'Eurostile Heading', 'Eurostile', system-ui, sans-serif;
+      font-weight: 700; font-size: clamp(28px, 5vw, 48px);
+      line-height: 1; margin: 0 0 18px; text-transform: uppercase;
+    }
+    .drop-desc { color: var(--color-text-secondary); font-size: 16px; line-height: 1.55; margin: 0 0 24px; max-width: 42ch; }
+    .drop-cta {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 14px 22px;
+      border: 1px solid var(--color-swu-yellow);
+      color: var(--color-swu-yellow);
+      font-family: 'Eurostile Heading', 'Eurostile', system-ui, sans-serif;
+      font-weight: 700; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase;
+      border-radius: var(--radius-md); text-decoration: none;
+      transition: background .15s, color .15s;
+    }
+    .drop-cta:hover { background: var(--color-swu-yellow); color: var(--color-text-inverted); }
+    /* 4-column grid: hero spans cols 1-2 Ã— rows 1-2 (a 2Ã—2 block at 5/7
+       aspect), and the four small cards auto-fill cols 3-4 Ã— rows 1-2.
+       Because hero_width = 2 Ã— small_width and both use aspect-ratio
+       5/7, hero_height ends up exactly 2 Ã— small_height â€” small cards
+       are precisely half the hero's height with no extra height math. */
+    .drop-cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .drop-card { display: block; transition: transform .2s, filter .2s; border-radius: 6px; overflow: hidden; min-width: 0; }
+    .drop-card:hover { transform: translateY(-4px); filter: drop-shadow(0 8px 24px rgba(241,196,74,0.25)); }
+    .drop-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .drop-card-hero { grid-column: 1 / span 2; grid-row: 1 / span 2; aspect-ratio: 5 / 7; }
+    .drop-card-small { aspect-ratio: 5 / 7; }
+    @media (max-width: 920px) {
+      .drop-cards { grid-template-columns: repeat(2, 1fr); }
+      .drop-card-hero { grid-column: 1 / -1; grid-row: auto; width: 100%; max-width: 280px; margin: 0 auto; }
+    }
+
+    /* === Timeline roadmap === */
+    .timeline { position: relative; padding: 24px 0 40px; }
+    .timeline-track { position: relative; display: grid; grid-template-columns: repeat(var(--tl-count, 5), minmax(0, 1fr)); gap: 0; }
+    @media (max-width: 920px) { .timeline-track { grid-template-columns: repeat(2, 1fr); gap: 20px; } }
+    .timeline-line {
+      position: absolute; top: 38px; left: 5%; right: 5%; height: 1px;
+      background: linear-gradient(90deg,
+        var(--color-text-tertiary) 0%, var(--color-text-tertiary) 35%,
+        var(--color-swu-yellow) 38%, var(--color-swu-yellow) 42%,
+        var(--color-border-light) 45%, var(--color-border-light) 100%);
+      z-index: 0;
+    }
+    @media (max-width: 920px) { .timeline-line { display: none; } }
+    .timeline-sweep {
+      position: absolute; top: 36px; left: 0; width: 80px; height: 5px;
+      background: linear-gradient(90deg, transparent, var(--color-swu-yellow), transparent);
+      box-shadow: 0 0 16px var(--color-swu-yellow);
+      border-radius: 999px;
+      animation: timelineSweep 8s linear infinite;
+      z-index: 1;
+    }
+    @media (max-width: 920px) { .timeline-sweep { display: none; } }
+    @keyframes timelineSweep {
+      0% { left: 5%; opacity: 0; }
+      8% { opacity: 1; }
+      92% { opacity: 1; }
+      100% { left: 95%; opacity: 0; }
+    }
+    .tl-node { position: relative; padding: 0 14px; text-align: center; }
+    .tl-node:first-child { padding-left: 0; }
+    .tl-node:last-child { padding-right: 0; }
+    .tl-dot {
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--color-bg-primary); border: 2px solid var(--color-text-tertiary);
+      margin: 30px auto 18px; position: relative; z-index: 2;
+    }
+    .tl-released .tl-dot { background: var(--color-text-tertiary); border-color: var(--color-text-tertiary); opacity: 0.5; }
+    .tl-upcoming .tl-dot {
+      border-color: var(--color-swu-yellow); background: var(--color-swu-yellow);
+      box-shadow: 0 0 0 6px rgba(241, 196, 74, 0.18), 0 0 20px rgba(241,196,74,0.4);
+      animation: timelinePulse 2s ease-in-out infinite;
+    }
+    .tl-announced .tl-dot { border-color: var(--color-swu-yellow); }
+    @keyframes timelinePulse {
+      0%, 100% { box-shadow: 0 0 0 6px rgba(241, 196, 74, 0.18), 0 0 20px rgba(241,196,74,0.4); }
+      50% { box-shadow: 0 0 0 10px rgba(241, 196, 74, 0.08), 0 0 28px rgba(241,196,74,0.5); }
+    }
+    .tl-code {
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      font-size: 11px; letter-spacing: 0.14em; color: var(--color-swu-yellow);
+    }
+    .tl-released .tl-code { color: var(--color-text-tertiary); }
+    .tl-name {
+      font-family: 'Eurostile Heading', 'Eurostile', system-ui, sans-serif;
+      font-weight: 700; font-size: 14px; text-transform: uppercase;
+      margin: 8px 0 10px; line-height: 1.2;
+      min-height: 2.4em; display: flex; align-items: flex-start; justify-content: center;
+      text-wrap: balance; letter-spacing: 0.01em;
+    }
+    .tl-released .tl-name { color: var(--color-text-secondary); }
+    .tl-date {
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      font-size: 11px; color: var(--color-text-tertiary); letter-spacing: 0.08em;
+    }
+    .tl-tag {
+      display: inline-block; margin-top: 10px;
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase;
+      padding: 2px 8px; border: 1px solid var(--color-border-light);
+      color: var(--color-text-secondary); border-radius: 2px;
+    }
+    .tl-upcoming .tl-tag { border-color: var(--color-swu-yellow); color: var(--color-swu-yellow); background: rgba(241,196,74,0.08); }
+
+    /* === Top decks 4-up grid === */
+    .decks-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+    @media (max-width: 1023px) { .decks-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 600px)  { .decks-grid { grid-template-columns: 1fr; } }
+    .deck-card {
+      display: flex; flex-direction: column; padding: 18px;
+      border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+      background: linear-gradient(180deg, rgba(255,255,255,0.018), transparent);
+      text-decoration: none; color: inherit;
+      transition: border-color .15s, transform .15s, background .15s;
+    }
+    .deck-card:hover {
+      border-color: var(--color-swu-yellow); transform: translateY(-2px);
+      background: rgba(241,196,74,0.03);
+    }
+    .deck-card-head {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--color-text-tertiary);
+    }
+    .deck-card-place {
+      padding: 3px 8px; background: rgba(241,196,74,0.1);
+      color: var(--color-swu-yellow); border: 1px solid rgba(241,196,74,0.3);
+      border-radius: 2px; font-weight: 700;
+    }
+    .deck-card-thumbs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+    .deck-card-thumbs img { width: 100%; aspect-ratio: 5/7; object-fit: cover; border-radius: 4px; display: block; }
+    .deck-card-name {
+      font-family: 'Eurostile Heading', 'Eurostile', system-ui, sans-serif;
+      font-weight: 700; font-size: 17px; text-transform: uppercase;
+      letter-spacing: 0.01em; line-height: 1.15;
+      margin: 0; color: var(--color-text-primary);
+    }
+
+    /* === Features ("What's here") â€” 4-up tile grid === */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+    @media (max-width: 1023px) { .features-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 600px)  { .features-grid { grid-template-columns: 1fr; } }
+    .feature-tile {
+      display: flex; flex-direction: column; gap: 10px;
+      padding: 20px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      background: linear-gradient(180deg, rgba(255,255,255,0.018), transparent);
+      text-decoration: none; color: inherit;
+      transition: border-color .15s, transform .15s, background .15s;
+      position: relative;
+    }
+    .feature-tile:hover {
+      border-color: var(--color-swu-yellow);
+      transform: translateY(-2px);
+      background: rgba(241,196,74,0.03);
+    }
+    .feature-tile-eyebrow {
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--color-swu-yellow);
+    }
+    .feature-tile-title {
+      margin: 0;
+      font-family: 'Eurostile Heading', 'Eurostile', system-ui, sans-serif;
+      font-weight: 700; font-size: 18px; text-transform: uppercase;
+      letter-spacing: 0.01em; color: var(--color-text-primary);
+    }
+    .feature-tile-desc {
+      margin: 0;
+      font-size: 14px; line-height: 1.55;
+      color: var(--color-text-secondary);
+    }
+
+    /* === FAQ â€” sharp triangle marker === */
+    .faq-list { display: flex; flex-direction: column; gap: 10px; }
+    .faq-item {
+      border: 1px solid var(--color-border);
+      border-left: 3px solid var(--color-border-light);
+      background: linear-gradient(180deg, rgba(255,255,255,0.015), transparent);
+      padding: 18px 22px; border-radius: var(--radius-md);
+      transition: border-color .15s, background .15s;
+    }
+    .faq-item:hover { border-left-color: var(--color-swu-yellow); }
+    .faq-item[open] { border-color: var(--color-swu-yellow); border-left-color: var(--color-swu-yellow); background: rgba(241, 196, 74, 0.04); }
+    .faq-item summary {
+      cursor: pointer; list-style: none;
+      font-family: 'Eurostile Heading', 'Eurostile', system-ui, sans-serif;
+      font-weight: 600; font-size: 16px; letter-spacing: 0.02em;
+      text-transform: uppercase; color: var(--color-text-primary);
+      position: relative; padding-right: 32px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .faq-item summary::-webkit-details-marker { display: none; }
+    .faq-item summary::before {
+      content: ""; flex-shrink: 0; width: 6px; height: 6px;
+      background: var(--color-swu-yellow);
+      transform: rotate(45deg); transition: transform .2s;
+    }
+    .faq-item[open] summary::before { transform: rotate(225deg); }
+    .faq-item summary::after {
+      content: "+";
+      position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      font-size: 22px; color: var(--color-text-tertiary); transition: color .15s;
+    }
+    .faq-item[open] summary::after { content: "âˆ’"; color: var(--color-swu-yellow); }
+    .faq-item p {
+      margin: 14px 0 4px 18px;
+      color: var(--color-text-secondary); line-height: 1.6;
+      font-size: 14.5px; font-weight: 400;
+      text-transform: none; letter-spacing: 0;
+    }
+    .faq-read-more a { color: var(--color-swu-yellow); font-weight: 700; text-decoration: none; font-size: 0.92rem; }
+    .faq-read-more a:hover { text-decoration: underline; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .timeline-sweep, .hero-tag-dot, .tl-upcoming .tl-dot { animation: none !important; }
+    }
+  </style>
+</Layout>

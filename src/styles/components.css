@@ -1,0 +1,842 @@
+﻿/* Component Styles
+ * Ported from optcg.one's components.css with Star Wars Unlimited-specific adaptations:
+ * - Filter chip colors swapped for the 6 Star Wars Unlimited inks
+ * - Type chips use Character/Action/Item/Location instead of L/C/E/S
+ * - Removed sections specific to OP (decklists table, deck builder, etc.)
+ */
+
+/* ===== Navigation ===== */
+.main-nav {
+  background-color: transparent;
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-lg);
+  padding: 5px 0;
+  transition: transform var(--transition-normal);
+}
+
+.main-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.main-nav li {
+  display: flex;
+}
+
+.main-nav li a {
+  text-decoration: none;
+  color: #FFFFFF;
+  font-family: 'Eurostile Heading', 'Eurostile', sans-serif;
+  font-weight: 500;
+  font-size: 0.875rem;          /* 14px (was 16px) */
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: var(--radius-md);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.main-nav li a svg {
+  display: none;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.main-nav li a:hover,
+.main-nav li a.active {
+  background-color: transparent;
+  color: var(--color-swu-gold);
+}
+
+/* ===== Search Bar ===== */
+.search-bar {
+  flex: 1;
+  min-width: 200px;
+  padding: var(--space-sm) 0;
+  font-size: var(--font-size-base);
+  border: none;
+  border-bottom: 2px solid var(--color-border);
+  border-radius: 0;
+  box-shadow: none;
+  box-sizing: border-box;
+  background-color: transparent;
+  color: var(--color-text-primary);
+  transition: border-color var(--transition-fast);
+}
+
+.search-bar:focus {
+  outline: none;
+  border-bottom-color: var(--color-swu-gold);
+}
+
+.search-bar::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+/* ===== Cards Grid (gallery mode is our default) ===== */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-lg);
+  margin-top: var(--space-lg);
+}
+
+@media (max-width: 767px) {
+  .cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+}
+
+.card {
+  position: relative;
+  display: block;
+  cursor: pointer;
+  aspect-ratio: 5 / 7;
+  contain-intrinsic-size: auto 280px;
+  content-visibility: auto;
+  border-radius: var(--radius-md);
+  transition: box-shadow var(--transition-fast);
+}
+.card:hover {
+  z-index: 2;
+  box-shadow: 0 0 0 2px var(--color-swu-gold);
+}
+.card[hidden] { display: none; }
+
+.card .card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.card-image {
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.card-image img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  color: transparent;
+}
+
+.card-image .no-image {
+  width: 100%;
+  height: 100%;
+  background: var(--color-bg-tertiary);
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
+/* Price badge â€” bottom-left corner, matches optcg's affiliate hook */
+.card-price-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: var(--color-text-inverted);
+  font-weight: bold;
+  font-size: 14px;
+  padding: 6px 10px;
+  border-radius: 50px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+  pointer-events: auto;
+  backdrop-filter: blur(4px);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+  transition: box-shadow var(--transition-fast);
+}
+
+.card-price-badge:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+}
+
+.card-price-badge .price-text {
+  display: inline-block;
+  color: #fff;
+}
+
+/* Cart icon â€” hidden by default, slides in on hover (optcg pattern) */
+.card-price-badge .cart-icon {
+  width: 0;
+  height: 12px;
+  max-height: 12px;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.card-price-badge:hover .cart-icon {
+  width: 16px;
+  max-width: 16px;
+  height: 12px;
+  max-height: 12px;
+  opacity: 1;
+  transform: scale(1);
+}
+
+@media (max-width: 768px) {
+  .card-price-badge {
+    font-size: 12px;
+    padding: 4px 8px;
+    bottom: 6px;
+    left: 6px;
+  }
+}
+
+/* ===== Search & Filter Controls ===== */
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: var(--space-md);
+}
+
+.top-controls-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 767px) {
+  .top-controls-row {
+    justify-content: center;
+    align-items: center;
+  }
+  /* Force the search bar to its own row so color chips + AA + filter
+     all share the next row, centered together. */
+  .top-controls-row .search-bar { flex: 0 0 100%; min-width: 0; }
+}
+
+/* Ink filter living next to the search bar (matches the builder layout) */
+.top-color-filter {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  justify-content: center;
+}
+
+.filters-row {
+  display: none;
+  gap: 15px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+}
+
+.filters-row.filters-visible {
+  display: flex;
+}
+
+.color-filter,
+.cost-filter,
+.type-filter,
+.rarity-filter,
+.property-filter,
+.ability-filter {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+}
+
+.ability-filter {
+  flex-basis: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.filter-chip {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+  text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+}
+
+.filter-chip:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.filter-chip.active {
+  border-color: var(--color-text-primary);
+  box-shadow: 0 0 0 1px var(--color-bg-elevated), 0 0 0 3px var(--color-text-primary);
+  transform: scale(1.1);
+}
+
+/* Star Wars Unlimited color chips â€” solid hex circles sampled from real card scans
+   (see scripts/sample-color-hex.js, then deleted). Faded inactive,
+   gold ring when active. */
+.color-chip {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-light);
+  opacity: 0.55;
+  transition: opacity var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+.color-chip:hover {
+  opacity: 0.9;
+  transform: scale(1.06);
+  box-shadow: none;
+}
+.color-chip.active {
+  opacity: 1;
+  border-color: #fff;
+  box-shadow: 0 0 0 2px #fff;
+  transform: scale(1.06);
+}
+.color-chip.white.active {
+  border-color: #000;
+  box-shadow: 0 0 0 2px #000;
+}
+.color-chip.blue   { background-color: #0772B2; border-color: #0772B2; }
+.color-chip.green  { background-color: #62A43D; border-color: #62A43D; }
+.color-chip.purple { background-color: #734D90; border-color: #734D90; }
+.color-chip.red    { background-color: #B60651; border-color: #B60651; }
+.color-chip.white  { background-color: #FDFDFD; border-color: #BFBFBF; }
+
+/* Type and cost chips */
+.type-chip { background: linear-gradient(135deg, #6f42c1, #4f2d92); }
+.cost-chip { background: linear-gradient(135deg, #007bff, #0056b3); }
+.cost-chip-high { background: linear-gradient(135deg, #b22222, #8b0000); width: auto; padding: 0 8px; border-radius: 13px; }
+.rarity-chip { background: linear-gradient(135deg, #d4a017, #a07d10); }
+
+.property-chip {
+  background: linear-gradient(135deg, #343a40, #23272b);
+  width: auto;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 13px;
+}
+
+.property-chip.active {
+  background: linear-gradient(135deg, #28a745, #218838);
+  border-color: #155724;
+  transform: scale(1.1);
+  box-shadow: 0 0 0 1px var(--color-bg-elevated), 0 0 0 3px #28a745;
+}
+
+/* Ability chips â€” wider pill shape, secondary color (so they read as
+   distinct from property chips) */
+.ability-chip {
+  background: linear-gradient(135deg, #495057, #343a40);
+  width: auto;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 13px;
+  font-size: 11px;
+}
+.ability-chip.active {
+  background: linear-gradient(135deg, #2196f3, #1976d2);
+  border-color: var(--color-accent-hover);
+  transform: scale(1.05);
+  box-shadow: 0 0 0 1px var(--color-bg-elevated), 0 0 0 3px var(--color-accent-primary);
+}
+
+/* ===== Icon toggles (filter toggle button) ===== */
+.icon-toggle {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  box-sizing: border-box;
+  transition: border-color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.icon-toggle:hover {
+  background-color: transparent;
+}
+
+.icon-toggle:hover span {
+  background-color: var(--color-swu-gold);
+}
+
+#filterToggleBtn span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background-color: var(--color-text-secondary);
+  margin: 2.5px auto;
+  border-radius: 2px;
+  transition: all 0.2s ease-in-out;
+}
+
+.icon-toggle.active span {
+  background-color: var(--color-swu-gold);
+}
+
+/* AA toggle button â€” text "AA" with 3 visual states (matches optcg):
+     default (no class)  â†’ secondary text color, neutral
+     .active (AA-only)   â†’ Federation Yellow accent
+     .inverse (regular)  â†’ Char's Custom Red */
+#toggleAABtn span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
+  background: none;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+
+#toggleAABtn:hover span {
+  color: var(--color-text-primary);
+  background: none;
+}
+
+#toggleAABtn.active span {
+  color: var(--color-swu-yellow);
+  background: rgba(241, 196, 74, 0.12);
+}
+
+#toggleAABtn.inverse span {
+  color: var(--color-swu-red);
+  background: rgba(198, 31, 43, 0.12);
+}
+
+/* ===== Modal â€” verbatim from optcg ===== */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--color-overlay);
+}
+
+.modal.show { display: block; }
+
+.modal-content {
+  background-color: var(--color-bg-elevated);
+  margin: 2% auto;
+  padding: var(--space-xl);
+  border-radius: 15px;
+  width: 90%;
+  max-width: 1000px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  gap: 30px;
+  position: relative;
+}
+
+.modal-image {
+  flex-shrink: 0;
+  width: 350px;
+  position: relative;
+}
+
+/* AA cycler â€” used in both card detail and database modal. Buttons
+   overlay the card image with prev/next arrows + a counter chip. */
+.modal-image .aa-prev-btn,
+.modal-image .aa-next-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(15, 15, 18, 0.85);
+  color: var(--color-swu-yellow);
+  font-size: 0.95rem;
+  cursor: pointer;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, color 0.15s;
+  backdrop-filter: blur(4px);
+}
+.modal-image .aa-prev-btn:hover,
+.modal-image .aa-next-btn:hover {
+  background: rgba(241, 196, 74, 0.95);
+  color: var(--color-text-inverted);
+}
+.modal-image .aa-badge-left  { left: -12px; }
+.modal-image .aa-badge-right { right: -12px; }
+.modal-image .aa-counter {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  background: rgba(15, 15, 18, 0.85);
+  color: var(--color-swu-yellow);
+  font-size: 0.75rem;
+  border-radius: 10px;
+  font-family: monospace;
+  backdrop-filter: blur(4px);
+  z-index: 2;
+}
+@media (max-width: 768px) {
+  .modal-image .aa-badge-left  { left: 8px; }
+  .modal-image .aa-badge-right { right: 8px; }
+}
+
+.modal-image img {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  display: block;
+}
+
+.modal-details {
+  flex: 1;
+}
+
+.modal-title-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 0 25px 0;
+}
+
+.modal-title-nav h2 {
+  margin: 0;
+  font-size: 28px;
+  color: var(--color-text-primary);
+  text-align: center;
+  flex-grow: 1;
+}
+
+.modal-nav-arrow {
+  font-size: 32px;
+  font-weight: bold;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  user-select: none;
+  padding: 0 15px;
+}
+
+.modal-nav-arrow:hover {
+  color: var(--color-text-primary);
+}
+
+/* Stats grid â€” 2 columns at desktop, single column at phone widths
+   so each row gets the full container width and is comfortable to read */
+.modal-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  margin-bottom: 25px;
+}
+
+@media (max-width: 600px) {
+  .modal-stats {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-sm);
+  }
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-lg);
+  border-left: 3px solid var(--color-accent-primary);
+}
+
+.stat-row.col-span-full { grid-column: 1 / -1; }
+
+.modal-stat-label {
+  font-weight: bold;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.modal-stat-value {
+  font-weight: bold;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
+}
+
+.modal-card-link {
+  color: var(--color-accent-primary);
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+.modal-card-link:hover { opacity: 0.7; }
+
+.modal-price-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  color: var(--color-text-primary);
+  transition: opacity 0.15s ease;
+}
+.modal-price-link:hover { opacity: 0.8; }
+
+.modal-tcg-logo { vertical-align: middle; }
+
+/* Effect block â€” blue tinted, blue accent border. Only the bottom-right
+   corner is rounded for a Star Wars Unlimited-card-like asymmetric notch. */
+.modal-effect {
+  background: var(--color-blue-light);
+  padding: var(--space-lg);
+  border-radius: 0 0 10px 0;
+  border-left: 4px solid var(--color-accent-primary);
+  margin-bottom: var(--space-md);
+}
+
+.modal-effect h3 {
+  margin: 0 0 10px 0;
+  color: var(--color-blue-dark);
+  font-size: var(--font-size-base);
+}
+
+.modal-effect p {
+  margin: 0;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+}
+
+/* Star Wars Unlimited effect-text formatting (used in modal and card detail page) */
+.effect-ability {
+  display: inline-block;
+  background: var(--color-text-primary);
+  color: var(--color-bg-elevated);
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.82em;
+  letter-spacing: 0.03em;
+  line-height: 1.4;
+  vertical-align: 1px;
+  margin-right: 2px;
+}
+
+.effect-keyword {
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.effect-reminder {
+  font-style: italic;
+  color: var(--color-text-secondary);
+}
+
+/* Trigger / flavor block â€” yellow tinted, orange accent border. Only the
+   bottom-right corner is rounded for the same asymmetric look. */
+.modal-trigger {
+  background: var(--color-warning-bg-alt);
+  padding: var(--space-lg);
+  border-radius: 0 0 10px 0;
+  border-left: 4px solid var(--color-warning);
+}
+
+.modal-trigger h3 {
+  margin: 0 0 10px 0;
+  color: var(--color-orange);
+  font-size: var(--font-size-base);
+}
+
+.modal-trigger p {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--color-text-primary);
+}
+
+.close {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  color: var(--color-text-tertiary);
+  font-size: 32px;
+  font-weight: bold;
+  cursor: pointer;
+  line-height: 1;
+  user-select: none;
+}
+.close:hover { color: var(--color-text-primary); }
+
+@media (max-width: 768px) {
+  .modal-content {
+    flex-direction: column;
+    padding: var(--space-lg);
+  }
+  .modal-image { width: 100%; max-width: 280px; margin: 0 auto; }
+}
+
+/* ===== Empty state ===== */
+.empty-state {
+  text-align: center;
+  padding: var(--space-2xl);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius-lg);
+  margin-top: var(--space-lg);
+}
+
+.empty-state .clear-btn {
+  margin-top: var(--space-sm);
+  background: var(--color-accent-primary);
+  color: var(--color-text-inverted);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.empty-state .clear-btn:hover { opacity: 0.9; }
+
+/* Page background â€” official Star Wars Unlimited cosmic art (mobile loads smaller variant)
+   muted by a parchment overlay so the palette still dominates and content
+   stays readable. Dark mode swaps to a kelp overlay. The bg is sized taller
+   than viewport so JS parallax can drift it on scroll without showing edges. */
+.page-bg {
+  position: fixed;
+  top: -20vh;
+  left: 0;
+  right: 0;
+  bottom: -20vh;
+  z-index: -1;
+  pointer-events: none;
+  /* Solid background â€” matches --color-bg-primary so sticky elements
+     using the same token blend in. Re-add background-image and the
+     ::after overlay once Star Wars Unlimited-themed bg art lands in public/bg/. */
+  background-color: var(--color-bg-primary);
+  will-change: transform;
+}
+
+/* TCGPlayer logo â€” recolored to Star Wars Unlimited Indigo via CSS mask of the
+   white silhouette in /tcgplayer-logo.webp. Used in both decklists
+   price-btn and builder buy button, always visible (no hover animation).
+   translateY nudges the icon up to match Brandon Condensed Black's
+   visible glyph, which sits in the upper part of its em-box. */
+.cart-icon {
+  display: inline-block;
+  width: 18px;
+  height: 14px;
+  background-color: var(--color-swu-indigo);
+  -webkit-mask: url('/tcgplayer-logo.webp') center / contain no-repeat;
+          mask: url('/tcgplayer-logo.webp') center / contain no-repeat;
+  flex-shrink: 0;
+  transform: translateY(-2px);
+}
+
+/* Site footer â€” Star Wars Unlimited Community Code attribution (required) */
+.site-footer {
+  margin-top: var(--space-2xl);
+  padding: var(--space-lg) var(--space-md);
+  background: transparent;
+  border-radius: 0;
+}
+.footer-credit {
+  margin: 0 auto;
+  max-width: 900px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+.footer-credit a {
+  color: var(--color-text-secondary);
+  text-decoration: underline;
+}
+.footer-credit a:hover {
+  color: var(--color-accent-primary);
+}
+
+/* Mobile nav (bottom-fixed on small screens, matching optcg) */
+@media (max-width: 767px) {
+  .main-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: var(--color-bg-elevated);
+    border-radius: 20px 20px 0 0;
+    border-top: 1px solid var(--color-border);
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+    z-index: 100;
+  }
+
+  .main-nav ul {
+    justify-content: space-around;
+  }
+
+  .main-nav li a {
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+
+  .main-nav li a svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+  }
+
+  /* Clear the fixed bottom nav so the footer credit stays visible */
+  .site-footer { margin-bottom: 70px; }
+}
