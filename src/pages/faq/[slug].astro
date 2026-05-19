@@ -4,16 +4,18 @@ import Navigation from '../../components/Navigation.astro';
 import { faqs } from '../../data/faqs.js';
 import '../../styles/pages/faq.css';
 
+interface Faq { slug: string; keyword?: string; q: string; short: string; long?: string; }
+
 export async function getStaticPaths() {
-  const { faqs: allFaqs } = await import('../../data/faqs.js');
+  const { faqs: allFaqs } = await import('../../data/faqs.js') as { faqs: Faq[] };
   // Only generate pages for entries that have long-form content.
   return allFaqs
-    .filter((f: any) => !!f.long)
-    .map((f: any) => ({ params: { slug: f.slug } }));
+    .filter(f => !!f.long)
+    .map(f => ({ params: { slug: f.slug } }));
 }
 
 const { slug } = Astro.params;
-const faq = faqs.find((f: any) => f.slug === slug);
+const faq = (faqs as Faq[]).find(f => f.slug === slug);
 if (!faq || !faq.long) {
   return Astro.redirect('/404');
 }

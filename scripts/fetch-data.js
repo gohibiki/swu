@@ -137,10 +137,18 @@ async function main() {
 
     let cardCount = 0;
     for (const p of products) {
-      const cardCode = pickExt(p.extendedData, 'Number');
-      // Skip sealed products (booster packs, boxes, etc.) â€” they have no
+      const rawNumber = pickExt(p.extendedData, 'Number');
+      // Skip sealed products (booster packs, boxes, etc.) — they have no
       // Number field. Only individual cards get included.
-      if (!cardCode) continue;
+      if (!rawNumber) continue;
+
+      // SWU's TCGCSV "Number" field is "94/264" (rank/total). Strip the
+      // /total suffix and pad to 3 digits so we get URL-safe canonical IDs
+      // like "ASH-094" instead of "ASH-94/264".
+      const setCode = g.abbreviation || g.name || '';
+      const numericPart = String(rawNumber).split('/')[0].replace(/[^0-9A-Za-z]/g, '');
+      const padded = /^\d+$/.test(numericPart) ? numericPart.padStart(3, '0') : numericPart;
+      const cardCode = setCode ? `${setCode}-${padded}` : padded;
 
       const rawRarity = pickExt(p.extendedData, 'Rarity');
       // Prefer Normal pricing (most cards); fall back to Holofoil if that's
