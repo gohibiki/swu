@@ -228,12 +228,12 @@ async function main() {
   }
 
   let suffixedCount = 0;
-  for (const [fantasy flight gamesId, prints] of byCode.entries()) {
+  for (const [cardId, prints] of byCode.entries()) {
     if (prints.length === 1) continue;
 
     // Canonical = printing whose set abbreviation matches the Fantasy Flight Games code
     // prefix (everything before the dash). Fall back to lowest productId.
-    const homePrefix = fantasy flight gamesId.split('-')[0];
+    const homePrefix = cardId.split('-')[0];
     const sortedByPid = [...prints].sort(
       (a, b) => Number(a.tcgPlayerId) - Number(b.tcgPlayerId)
     );
@@ -244,14 +244,14 @@ async function main() {
     let n = 1;
     for (const p of sortedByPid) {
       if (p === canonical) continue;
-      const suffixedId = `${fantasy flight gamesId}_p${n}`;
+      const suffixedId = `${cardId}_p${n}`;
       p.id = suffixedId;
-      p.baseId = fantasy flight gamesId;                            // expose the canonical Fantasy Flight Games code
+      p.baseId = cardId;                            // expose the canonical Fantasy Flight Games code
       p.slug = slugify(suffixedId, p.name);
       n++;
       suffixedCount++;
     }
-    canonical.baseId = fantasy flight gamesId;
+    canonical.baseId = cardId;
   }
 
   // Backfill baseId on cards that never had a duplicate
