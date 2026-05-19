@@ -1,4 +1,4 @@
-﻿---
+---
 import Layout from '../layouts/Layout.astro';
 import Navigation from '../components/Navigation.astro';
 import { loadCardData } from '../utils/loadCardData.js';
@@ -134,44 +134,44 @@ const roadmap = [...released, ...future];
 // release schedule research.
 const faqs = [
   {
-    q: "What is the Star Wars Unlimited?",
-    a: "The Star Wars Unlimited (SWU) is a two-player trading card game by Fantasy Flight Games, launched in 2024. Each player builds a 50-card main deck plus a 10-card resource deck and battles with Mobile Suits, Pilots, Bases, and Commands. The game uses an AP/HP combat system with a 6-card shield zone: knock all six shields out and land one more point of damage to win."
+    q: "What is Star Wars Unlimited?",
+    a: "Star Wars Unlimited (SWU) is a two-player trading card game by Fantasy Flight Games, launched in March 2024. Each player chooses a Leader and a Base, then builds a main deck of at least 50 cards. Units fight in two arenas (Ground and Space), and the game ends when one player reduces the opponent's Base HP to zero."
   },
   {
     q: "How do I build a deck?",
-    a: "A legal deck is exactly 50 cards (Units, Pilots, Commands, and Bases) plus a separate 10-card resource deck. You may use one or two of the four colors (Blue, Green, Red, White) and a maximum of four copies of any card sharing the same card number. Resource cards have no copy limit in the resource deck. The full rules are on the /how-to-play page."
+    a: "A legal SWU deck contains exactly one Leader, exactly one Base, and a main deck of at least 50 cards (with no upper limit). You may have a maximum of 3 copies of any card by name. Cards from your Leader's two aspects (Alignment plus Style) play without penalty; off-aspect cards cost 2 extra Resources. The full rules are on the /how-to-play page."
   },
   {
     q: "Where can I find a Star Wars Unlimited deck builder?",
-    a: "A drag-and-drop builder is in development on this site. Until it ships, the /database page lets you filter all cards by color, type, cost, AP/HP, level, rarity, and keyword, enough to draft a list by hand."
+    a: "The /builder page on this site lets you pick a Leader, choose a Base, and add cards to a 50-card minimum main deck. Aspect matching and the 3-copy limit are enforced live, and you can export the list or buy it on TCGplayer in one click."
   },
   {
     q: "Where do I find competitive decklists?",
-    a: "Decklist scraping is being wired up. Community lists from Fantasy Flight Games's Newtype Challenge events, Store Championships, and Regionals will populate the /decklists page once the pipeline lands. For now, Fantasy Flight Games's own event hub at starwarsunlimited.com publishes top-cut lists from major tournaments."
+    a: "Tournament decklists from Regional Qualifiers, Showdowns, Sector and Galactic Championships will populate the /decklists page (pipeline pending). For now, results from Fantasy Flight Games organized play and community-run events at starwarsunlimited.com and melee.gg are the source of truth."
   },
   {
     q: "Can I play Star Wars Unlimited online?",
-    a: "There is no official Fantasy Flight Games-hosted online client as of mid-2026. Most digital play is community-run. Tabletop Simulator setups are the most active option, and the Star Wars Unlimited subreddit and Discord track the latest mod links. The official Fantasy Flight Games TCG+ platform handles event registration and store qualifiers but not digital play."
+    a: "There is no official Fantasy Flight Games-hosted digital client as of mid-2026. Most digital play happens on Tabletop Simulator (the most active community option) and through informal Discord matchmaking. The official Star Wars Unlimited Companion app handles deck registration and event check-ins but does not include digital gameplay."
   },
   {
     q: "What's the latest set?",
-    a: `The most recent set indexed in this database is ${latestSet?.name || 'the current main release'} (${latestSetId || ''}). Fantasy Flight Games's 2026 schedule continues with Generation Pulse [ST10] and Eternal Nexus [EB01] in June, then Freedom Ascension [GD05] in July and Stardust Trails [GD06] in October. Check the official products page for region-specific dates.`
+    a: `The most recent set indexed in this database is ${latestSet?.name || 'the current main release'} (${latestSetId || ''}). Fantasy Flight Games releases roughly one main set every 3-4 months. The release order so far: Spark of Rebellion, Shadows of the Galaxy, Twilight of the Republic, Jump to Lightspeed, Legends of the Force, Secrets of Power, A Lawless Time, Ashes of the Empire, Twin Suns. Check starwarsunlimited.com for region-specific dates.`
   },
   {
     q: "Where can I buy Star Wars Unlimited singles and sealed product?",
-    a: "Sealed product (boosters and starter decks) is sold through Fantasy Flight Games TCG+ authorized retailers and most local game stores carrying Fantasy Flight Games titles. Singles are widely available on TCGPlayer, which added the game to its catalog in 2025. Card pages on this site link directly to TCGPlayer with affiliate tagging, and purchases support the site at no extra cost to you."
+    a: "Sealed product (booster boxes, starter decks, prerelease kits) is sold through Fantasy Flight Games authorized retailers and most local game stores. Singles are widely available on TCGplayer. Card pages on this site link directly to TCGplayer with affiliate tagging, and purchases support the site at no extra cost to you."
   },
   {
     q: "What deck should a beginner buy?",
-    a: "Start with the newest legal Starter Deck from your region rather than building from boosters. Fantasy Flight Games runs a dedicated Starter Deck Battle Event throughout 2026 specifically for new-player on-ramps, so a starter is the most supported entry point. The Generation Pulse [ST10] starter line is the latest scheduled wave."
+    a: "Start with a Two-Player Starter Set or an Intro Battle product (such as Intro Battle: Hoth). Each contains two pre-built tournament-legal decks with their Leaders, Bases, and damage tokens, plus a rules sheet. Pick the one whose Leaders match the Star Wars era you most enjoy, then move on to a booster box of the latest main set."
   },
   {
-    q: "What does AP, HP, and Lv mean on a card?",
-    a: "AP is attack points (offensive strength), HP is hit points (defensive strength, when it reaches zero the Unit is destroyed), and Lv is the required level to deploy a Unit. Some Units also have a Link condition: pair them with a matching Pilot and they can attack the turn they deploy. See /how-to-play for full combat math."
+    q: "What do Cost, Power, HP, and Arena mean on a card?",
+    a: "Cost is the number of Resources you exhaust to play the card. Power is the damage a Unit deals in combat. HP is hit points; when reduced to zero the Unit is defeated. Arena (Units only) is either Ground or Space, and Units only fight other Units in the same arena. Leaders, Bases, Events, and Upgrades have no arena."
   },
   {
-    q: "What are the keyword effects?",
-    a: "The seven core keyword effects from comprehensive rules v1.6.0 are: <Repair X> (heal X HP at end of turn), <Breach X> (deal X damage to top shield when destroying an enemy Unit), <Support X> (rest to give a friendly Unit AP+X), <Blocker> (redirect attacks to this Unit), <First Strike> (deal damage before the defender), <High-Maneuver> (enemies can't activate <Blocker>), and <Suppression> (damage two shields at once). Each is filterable on the /database page."
+    q: "What are the keyword abilities?",
+    a: "Star Wars Unlimited keywords include Ambush (act immediately after deploy), Grit (gain power equal to damage taken), Overwhelm (excess damage flows to the base), Raid (gain power when attacking the base), Restore (heal the base when attacking the base), Saboteur (ignore Sentinel), Sentinel (must be attacked first), Shielded (one-time shield token on deploy), and Smuggle (deploy from hyperspace at a discount). Each is filterable on the /database page."
   }
 ];
 ---

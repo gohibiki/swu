@@ -1,64 +1,63 @@
-﻿// Star Wars Unlimited filter values, derived from the official Comprehensive
-// Rules v1.6.0 (April 9, 2026) â€” see public/swu-comprehensive-rules-1.6.0.pdf
-// Sections: 3 (Card Types), 6-1 (Deck Construction), 13 (Keyword Effects).
+// Star Wars Unlimited filter values.
+// Cards have two aspects: one Alignment (Heroism/Villainy) + one Style
+// (Vigilance/Cunning/Aggression/Command), or "None" for neutral cards/tokens.
+// TCGCSV serves them semicolon-joined in extendedData.Aspect, e.g. "Command;Villainy".
 
-// The 5 colors a deck may be built from (max 2 colors per deck â€” rule
-// 6-1-1-2). `key` matches the API `color` field exactly (mixed case).
-// Hex values were sampled from the cost-indicator region of multiple
-// real Fantasy Flight Games card scans (see scripts/sample-color-hex.js) and averaged
-// across 3-4 cards per color to filter out noise.
-export const COLORS = [
-  { key: 'Blue',   label: 'Blue',   hex: '#0772B2' },  /* Federation blue */
-  { key: 'Green',  label: 'Green',  hex: '#62A43D' },  /* Earth green */
-  { key: 'Purple', label: 'Purple', hex: '#734D90' },  /* Witch from Mercury / IBO violet */
-  { key: 'Red',    label: 'Red',    hex: '#B60651' },  /* Char's red â€” magenta-leaning */
-  { key: 'White',  label: 'White',  hex: '#FDFDFD' }   /* near-pure white from card frame */
+// All six aspects + a None bucket for neutral cards.
+export const ASPECTS = [
+  { key: 'Heroism',    label: 'Heroism',    hex: '#3A77BC' },  // blue
+  { key: 'Villainy',   label: 'Villainy',   hex: '#1F1F1F' },  // black
+  { key: 'Vigilance',  label: 'Vigilance',  hex: '#2D6BB1' },  // royal blue
+  { key: 'Cunning',    label: 'Cunning',    hex: '#E8C72B' },  // yellow
+  { key: 'Aggression', label: 'Aggression', hex: '#C8362A' },  // red
+  { key: 'Command',    label: 'Command',    hex: '#5D7C3F' },  // olive green
+  { key: 'None',       label: 'Neutral',    hex: '#888888' }   // grey
 ];
 
-// Backwards-compat alias for legacy imports (lorcana fork pages still use INKS).
-export const INKS = COLORS;
+// Backwards-compat aliases for templates carried over from the gundam fork
+// (still reference COLORS / INKS in places). Map all three to ASPECTS so
+// the filter UI keeps working until those pages are migrated.
+export const COLORS = ASPECTS;
+export const INKS   = ASPECTS;
 
-// Card types (rule 3-1). Resource cards live in the resource deck only;
-// the main deck holds Unit, Pilot, Command, Base.
-export const CARD_TYPES = ['Unit', 'Pilot', 'Command', 'Base', 'Resource'];
+// Card types per the SWU comprehensive rules.
+// Leader + Base are 1-of slots in a legal deck; Unit, Event, Upgrade live in the main deck.
+export const CARD_TYPES = ['Leader', 'Base', 'Unit', 'Event', 'Upgrade'];
 
-// Rarity codes as they appear in dotgg's data, in roughly ascending value order.
+// Arenas where Units fight. Set on Units only; Leaders/Bases/Events/Upgrades have no arena.
+export const ARENAS = ['Ground', 'Space'];
+
+// Rarity codes as TCGCSV serves them. SWU uses Common/Uncommon/Rare/Legendary/Special.
 export const RARITIES = [
-  { key: 'C',   label: 'Common' },
-  { key: 'U',   label: 'Uncommon' },
-  { key: 'R',   label: 'Rare' },
-  { key: 'SR',  label: 'Super Rare' },
-  { key: 'LR',  label: 'Legendary Rare' },
-  { key: 'P',   label: 'Promo' }
+  { key: 'C', label: 'Common' },
+  { key: 'U', label: 'Uncommon' },
+  { key: 'R', label: 'Rare' },
+  { key: 'L', label: 'Legendary' },
+  { key: 'S', label: 'Special' }
 ];
 
-// The seven keyword effects (rule 13-1) plus the timing keywords (rule 13-2)
-// commonly used as filter targets. Tests match either the bracketed keyword
-// form (`<Repair X>`, `[Deploy]`) or the bare word, since dotgg's description
-// text uses both depending on the card.
+// SWU keyword abilities (the ones cards reference in description text).
+// Tests look for either bracketed forms or the bare word.
+// Source: SWU comprehensive rules + community wiki.
 export const ABILITIES = [
-  // Keyword effects (13-1)
-  { key: 'repair',         label: 'Repair',         test: t => /<Repair\b|\bRepair\s*\d/i.test(t) },
-  { key: 'breach',         label: 'Breach',         test: t => /<Breach\b|\bBreach\s*\d/i.test(t) },
-  { key: 'support',        label: 'Support',        test: t => /<Support\b|\bSupport\s*\d/i.test(t) },
-  { key: 'blocker',        label: 'Blocker',        test: t => /<Blocker\b|\bBlocker\b/i.test(t) },
-  { key: 'first-strike',   label: 'First Strike',   test: t => /<First\s*Strike\b|\bFirst\s*Strike\b/i.test(t) },
-  { key: 'high-maneuver',  label: 'High-Maneuver',  test: t => /<High[\s-]?Maneuver\b|\bHigh[\s-]?Maneuver\b/i.test(t) },
-  { key: 'suppression',    label: 'Suppression',    test: t => /<Suppression\b|\bSuppression\b/i.test(t) },
-  // Timing keywords (13-2)
-  { key: 'deploy',         label: 'Deploy',         test: t => /\[Deploy\]/i.test(t) },
-  { key: 'attack',         label: 'Attack',         test: t => /\[Attack\]/i.test(t) },
-  { key: 'destroyed',      label: 'Destroyed',      test: t => /\[Destroyed\]/i.test(t) },
-  { key: 'when-paired',    label: 'When Paired',    test: t => /\[When\s*Paired\]/i.test(t) },
-  { key: 'during-pair',    label: 'During Pair',    test: t => /\[During\s*Pair\]/i.test(t) },
-  { key: 'main',           label: 'Main',           test: t => /\[Main\]/i.test(t) },
-  { key: 'action',         label: 'Action',         test: t => /\[Action\]/i.test(t) },
-  { key: 'burst',          label: 'Burst',          test: t => /\[Burst\]/i.test(t) },
-  { key: 'activate-main',  label: 'Activateãƒ»Main',  test: t => /(Activate[ãƒ»Â·]?Main|\[Activate[ãƒ»Â·\s]Main\])/i.test(t) }
+  { key: 'ambush',     label: 'Ambush',     test: t => /\bAmbush\b/i.test(t) },
+  { key: 'bounty',     label: 'Bounty',     test: t => /\bBounty\b/i.test(t) },
+  { key: 'coordinate', label: 'Coordinate', test: t => /\bCoordinate\b/i.test(t) },
+  { key: 'exploit',    label: 'Exploit',    test: t => /\bExploit\b/i.test(t) },
+  { key: 'grit',       label: 'Grit',       test: t => /\bGrit\b/i.test(t) },
+  { key: 'hidden',     label: 'Hidden',     test: t => /\bHidden\b/i.test(t) },
+  { key: 'overwhelm',  label: 'Overwhelm',  test: t => /\bOverwhelm\b/i.test(t) },
+  { key: 'piloting',   label: 'Piloting',   test: t => /\bPiloting\b/i.test(t) },
+  { key: 'raid',       label: 'Raid',       test: t => /\bRaid\b/i.test(t) },
+  { key: 'restore',    label: 'Restore',    test: t => /\bRestore\b/i.test(t) },
+  { key: 'saboteur',   label: 'Saboteur',   test: t => /\bSaboteur\b/i.test(t) },
+  { key: 'sentinel',   label: 'Sentinel',   test: t => /\bSentinel\b/i.test(t) },
+  { key: 'shielded',   label: 'Shielded',   test: t => /\bShielded\b/i.test(t) },
+  { key: 'smuggle',    label: 'Smuggle',    test: t => /\bSmuggle\b/i.test(t) },
 ];
 
-// Format a Star Wars Unlimited description string for display. dotgg returns descriptions
-// either as plain text (older imports) or with HTML markup (newer cards).
+// Format a SWU description string for display. TCGCSV returns descriptions
+// either as plain text or with HTML markup (mark/b/i/br).
 const _ABILITY_RE = /(\b[A-Z][A-Z'!]*(?![a-z])(?:[\s,]+(?:[A-Z][A-Z'!]*(?![a-z])|\+\d+))+|\b[A-Z]{2,}[A-Z'!]*(?![a-z]))/g;
 
 export function boldKeywords(text) {

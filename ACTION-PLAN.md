@@ -1,4 +1,4 @@
-﻿# Action Plan, swutcg.one technical SEO
+# Action Plan, swutcg.one technical SEO
 
 **Date:** 2026-05-19
 **Source:** Full Audit Report 2026-05-19 (overall 89/100, no critical issues)

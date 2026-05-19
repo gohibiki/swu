@@ -1,11 +1,11 @@
-﻿# CLAUDE.md
+# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-# swutcg.one â€” Star Wars Unlimited Database
+# swutcg.one — Star Wars Unlimited Database
 
 ## Overview
-Static Astro site for the Star Wars Unlimited (Fantasy Flight Games). Hosted on Cloudflare Pages.
+Static Astro site for Star Wars Unlimited (Fantasy Flight Games). Forked from the gundamtcg.one template; same TCGCSV-driven pipeline. Hosted on Cloudflare Pages.
 
 ## Tech Stack
 - **Framework**: Astro 6 with TypeScript (Node 22+)
@@ -18,88 +18,101 @@ Static Astro site for the Star Wars Unlimited (Fantasy Flight Games). Hosted on 
 npm run dev               # Astro dev server
 npm run build             # Decompress data + astro check + astro build + IndexNow
 npm run preview           # Preview production build
-npm run fetch-data        # Pull cards + sets + prices from TCGCSV
-npm run fetch-decklists   # Scrape tournament decklists from tcgtopdecks-hq.com
+npm run fetch-data        # Pull cards + sets + prices from TCGCSV (categoryId 79)
 npm run download-images   # Mirror card images from TCGPlayer CDN
 ```
 
 ## Data sources
 
-| Layer | Source | What we get | Auth |
-|-------|--------|-------------|------|
-| Card metadata + prices | **TCGCSV** (`tcgcsv.com/tcgplayer/86/...`) | Full Fantasy Flight Games catalog (GD01-GD04, ST01-ST10, EB01, promos), TCGPlayer productIds, low/mid/high/market prices | None â€” but they gate the default Node fetch UA, so we send a custom one |
-| Card images | **TCGPlayer CDN** (`tcgplayer-cdn.tcgplayer.com/product/{productId}_in_1000x1000.jpg`) | High-res JPEGs, converted to WebP via sharp on download | None |
-| Tournament decklists | **tcgtopdecks-hq.com** (`/swu-cg-decks-{set}/`) â€” scraped via `cloudscraper` + `jsdom` | TablePress tables with deck composition encoded as `{N}n{cardId}a` | None â€” Cloudflare-protected, cloudscraper bypasses |
+| Layer | Source | Notes |
+|-------|--------|-------|
+| Card metadata + prices | **TCGCSV** (`tcgcsv.com/tcgplayer/79/...`) | Full Star Wars Unlimited catalog. Set codes are 3-letter (SOR, SHD, TWI, JTL, LOF, SEC, LAW, ASH, TS26, IBH, GFT, CE2025, SN1, WPP-suffixed promos). |
+| Card images | **TCGPlayer CDN** | High-res JPEGs, converted to WebP via sharp on download. |
+| Tournament decklists | **TBD** — `melee.gg` and `swustats.net` are candidates. | Scraper not yet wired. `/decklists` page renders empty-state until populated. |
 
-TCGCSV replaced dotgg.gg in this repo because dotgg's coverage caps at GD02 â€” they don't index GD03/GD04/EB01/ST07+. TCGCSV mirrors TCGplayer's catalog daily and has every card the moment TCGplayer lists it (typically near release).
+## URLs & trailing slashes
+`astro.config.mjs` uses `trailingSlash: 'never'` and `build.format: 'file'`. Pages serve at `/database`, `/card/{id}` — no trailing slashes anywhere.
 
-## Daily refresh
-`.github/workflows/fetch-data.yml` runs daily at 06:00 UTC and on `workflow_dispatch`:
-1. `git fetch && git reset --hard origin/main` (race-safe sync)
-2. `node scripts/fetch-data.js` â€” TCGCSV catalog + prices
-3. `node scripts/fetch-decklists.js` â€” tcgtopdecks-hq scrape
-4. `node scripts/download-images.js` â€” fetch any new card images via TCGPlayer CDN
-5. `node scripts/process-card-images.js` â€” sharp generates 160w / 640w variants
-6. Commit only if `data/` or `public/cards/` changed; push.
+## Card schema (post-TCGCSV)
 
-## URLs & Trailing Slashes
-`astro.config.mjs` uses `trailingSlash: 'never'` and `build.format: 'file'`. Pages serve at `/database`, `/card/{id}` â€” no trailing slashes anywhere (links, canonicals, sitemap).
+Each card in `data/cards.json.br` is a clean object:
 
-## Card schema (post-TCGCSV migration)
-
-Each card in `data/cards.json.br` is a clean object â€” no column-store reshape:
-
-| Field | Source in TCGCSV | Notes |
-|-------|-------------------|-------|
-| `id` | `extendedData[Number]` | Fantasy Flight Games card code, e.g. `GD03-001`, `GD03-001_p1` (alt-art) |
+| Field | TCGCSV source | Notes |
+|-------|---------------|-------|
+| `id` | `extendedData[Number]` (cleaned) | SWU card code, e.g. `SOR-001`, `ASH-094` |
 | `slug` | synthesized | `{id}-{slugified-name}` for URL routing |
-| `name` | `name` | "Star Wars Unlimited NT-1" |
-| `cleanName` | `cleanName` | ASCII-safe variant from TCGplayer |
-| `set` | from group abbreviation | `GD03`, `ST01`, `EB01`, `SWU-PR`, etc. |
-| `groupId` | TCGCSV groupId | Joins back to set list |
-| `type` | `extendedData[CardType]` | `Unit`, `Pilot`, `Command`, `Base`, `Resource` |
-| `color` | `extendedData[Color]` | `Blue`, `Green`, `Purple`, `Red`, `White` (5 colors) |
-| `rarity` | `extendedData[Rarity]` mapped via `RARITY_SHORT` | `C`, `U`, `R`, `SR`, `LR`, `P` (full label kept in `rarityFull`) |
-| `cost`, `level`, `ap`, `hp` | `extendedData` numeric fields | All converted to `Number` or `null` |
-| `trait` | `extendedData[Trait]` | e.g. `(Earth Federation)` |
-| `link` | `extendedData[Link Condition]` | Pilot link, e.g. `[Christina Mackenzie] / [Amuro Ray]` |
-| `description` / `action` | `extendedData[Description]` | Card text. `action` is an alias used by older page templates |
+| `name` | `name` | "Moff Jerjerrod - We Shall Redouble Our Efforts" |
+| `cleanName` | `cleanName` | ASCII-safe variant |
+| `set` | from group abbreviation | `SOR`, `SHD`, `LAW`, `ASH`, etc. |
+| `groupId` | TCGCSV `groupId` | Joins back to set list |
+| `type` | `extendedData[CardType]` | `Leader`, `Base`, `Unit`, `Event`, `Upgrade` |
+| `aspects` | `extendedData[Aspect]`, split on `;` | Multi-value array, e.g. `['Command', 'Villainy']` |
+| `aspect` | first element of `aspects` | Convenience for single-aspect lookups |
+| `rarity` | `extendedData[Rarity]` mapped via `RARITY_SHORT` | `C`, `U`, `R`, `L`, `S` |
+| `cost` | `extendedData[Cost]` | Number |
+| `power` | `extendedData[Power]` | Number (Units only) |
+| `hp` | `extendedData[HP]` | Number (Units and Bases) |
+| `traits` | `extendedData[Traits]`, split on `;` | Multi-value (Imperial, Official, Force, Rebel, etc.) |
+| `arena` | `extendedData[Arena Type]` | `Ground` or `Space` (Units only) |
+| `description` | `extendedData[Description]` | Card text, may include `<mark>` / `<b>` / `<i>` markup |
 | `tcgPlayerId` | `productId` | Used by `getTcgAffiliateUrl()` |
-| `productUrl` | TCGCSV `url` | TCGplayer product page direct link |
 | `imageUrl` | TCGCSV `imageUrl` | TCGplayer CDN, `_200w.jpg` |
-| `price`, `priceLow`, `priceMid`, `priceHigh`, `priceFoil` | TCGCSV `/prices` endpoint | All Normal subtype, Holofoil split into `priceFoil` |
+| `price` family | TCGCSV `/prices` endpoint | Normal subtype preferred, Foil split into `priceFoil` |
 | `releasedOn`, `isPresale` | `presaleInfo` | Used by the homepage roadmap |
 
-Fields TCGCSV does NOT provide: `zone` (Space/Earth/Both â€” not in extendedData) and `source_title` (anime/series). These render blank when displayed; pages handle gracefully.
+Legacy aliases retained for template compat: `color` (mirrors first aspect), `trait` (raw Traits string), `action` (mirrors description).
 
-## Set list (from TCGCSV groups)
+## Set classification (`src/utils/setData.js`)
 
-20 groups. `setData.js` classifies each:
-- `kind: 'main'` â€” `GD01`-`GD04`+ (booster sets)
-- `kind: 'starter'` â€” `ST01`-`ST10`+
-- `kind: 'extra'` â€” `EB01`+
-- `kind: 'promo'` â€” `SWU-PR`, `EXBP`, `EXRP`, `RP`
-- `kind: 'special'` â€” `GD01_b` (Edition Beta), other Fantasy Flight Games-internal groupings
+The classifier handles SWU's 3-letter and patterned codes:
+
+| Pattern | Kind |
+|---|---|
+| 3 capital letters (`SOR`, `SHD`, `LAW`, `ASH`, ...) | `main` |
+| `TS\d+` (Twin Suns numbered) | `main` |
+| `IB[A-Z]` (Intro Battle) | `starter` |
+| `SN\d`, `CE\d+`, `*WPP` suffix | `promo` |
+| `GFT` (Gift Box) | `special` |
+| anything else | `special` |
 
 ## Page inventory
 
-| Route | Purpose |
-|-------|---------|
-| `/` | Homepage â€” hero + spotlight + latest decks + roadmap + features + FAQ |
-| `/database` | Card database with search/filters + AA toggle (3-state: all/AA-only/regular-only) |
-| `/builder` | 50-card main + 10-card resource deck builder, click-to-add, color/copy validation, URL-shareable hash |
-| `/decklists` | Tournament decklists scraped from tcgtopdecks-hq |
-| `/how-to-play` | Rules walkthrough + the official PDF (`/swu-comprehensive-rules-1.6.0.pdf`) |
-| `/card/[id]` | Card detail page with alt-art cycler |
-| `/set/[slug]` | Per-set card listing |
-| `/404` | 404 page |
+| Route | Status | Purpose |
+|-------|--------|---------|
+| `/` | Live | Hero + spotlight + roadmap + features + FAQ |
+| `/database` | Live | Card database with Aspect / Type / Arena / Cost / Power / HP filters |
+| `/builder` | Live | Leader + Base + 50-card minimum builder; aspect-cost penalty enforcement TODO |
+| `/decklists` | Stub | Empty-state until a scraper is wired |
+| `/how-to-play` | Live | Rules walkthrough (manually authored, not from a PDF) |
+| `/card/[id]` | Live | Card detail page with alt-art cycler |
+| `/set/[slug]` | Live | Per-set card listing |
+| `/404` | Live | 404 page |
 
-## Things that still carry over from the lorcana fork
+## Outstanding work (post-clone)
 
-- `src/utils/cardConstants.js` â€” keyword and color constants are Star Wars Unlimited-specific. Older pages may still reference `INKS` (alias for `COLORS`).
-- `src/styles/` may contain unused Lorcana CSS classes (`.amber`, `.amethyst`, etc.) â€” harmless dead code, low priority cleanup.
-- `src/pages/set/[slug].astro` â€” works but uses generic templating; can be polished.
+1. **Decklist scraper** — pick between `melee.gg` (richer event data, Cloudflare-protected) and `swustats.net` (simpler structure). Wire similarly to lorcana's `nodriver-cf-verify` pattern if going with melee.
+2. **Aspect-cost penalty in /builder** — current build doesn't apply the +2 cost for off-aspect cards. Rule is well-known; should be one helper function.
+3. **Brand assets** — `public/favicon.svg`, `apple-touch-icon.png`, `social-preview.png` still inherited from gundam. Need SWU-themed replacements (Star Wars logotype or aspect-icon mark).
+4. **Manifest** — `public/manifest.json` was deleted during clone; regenerate after favicons are in place.
+5. **Theme color** — currently `#1A237E` (placeholder dark navy in `src/layouts/Layout.astro`). Pick the canonical SWU brand color.
+6. **Aspect hex values** — see `src/utils/cardConstants.js`. Current values are reasonable approximations; sample from real card scans to refine.
+7. **CSS tokens** — `src/styles/tokens.css` has `--color-swu-yellow`, `--color-swu-gold` etc. that were the gundam Federation palette. Rename or update values to a SWU-appropriate palette.
 
-## Manual asset replacements still pending
-- `public/social-preview.png` (1200Ã—630 OG image â€” currently inherited from lorcana)
-- `public/manifest.json` â€” rewrite name + theme color if you change branding
+## How this fork was created
+
+Literal copy-paste of `gundam/`, then:
+- `cp -r gundam swu` + wipe `.git` + `git init`
+- `sed` find/replace across `*.astro,*.js,*.ts,*.css,*.json,*.md,*.txt,*.xml` for: `gundamtcg.one → swutcg.one`, `Gundam Card Game → Star Wars Unlimited`, `Bandai → Fantasy Flight Games`, `GCG → SWU`, plus 15 more passes.
+- Card schema mapping in `scripts/fetch-data.js` updated for SWU's `extendedData` field names (`Aspect`, `Power`, `Arena Type`, `Traits`).
+- Set classifier in `src/utils/setData.js` rewritten for SWU 3-letter codes.
+- `src/utils/cardConstants.js` rewritten with SWU `ASPECTS`, `CARD_TYPES`, `ARENAS`, and `ABILITIES`.
+- `src/components/SearchFilters.astro`, `src/pages/card/[id].astro`, `src/pages/builder.astro` updated for SWU fields.
+- FAQ + `/how-to-play` content rewritten for SWU mechanics.
+- IndexNow key rotated; verification file regenerated under `public/{KEY}.txt`.
+- Gundam-only files stripped: comprehensive-rules PDF, `scripts/scrape-tcgtopdecks/`, `scripts/fetch-decklists.js`, `src/utils/loadDecklists.js`, stale `data/*.json.br`, old `manifest.json`.
+
+## Don't put here
+
+- Per-page implementation details that already live in the page itself.
+- Secret keys (none required).
+- Speculation about future features — wait until they're real.

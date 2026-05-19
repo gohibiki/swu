@@ -1,4 +1,4 @@
-﻿// Build-time loader for Star Wars Unlimited set metadata.
+// Build-time loader for Star Wars Unlimited set metadata.
 // Reads data/sets.json.br (refreshed daily by scripts/fetch-data.js from
 // dotgg.gg's /cgfw/getsets endpoint) and exposes a lookup keyed by set ID.
 import fs from 'fs';

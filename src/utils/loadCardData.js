@@ -11,7 +11,8 @@ import zlib from 'zlib';
 export async function loadCardData() {
   const dataDir = path.join(process.cwd(), 'data');
   if (!fs.existsSync(dataDir)) {
-    throw new Error('data/ directory not found. Run `npm run fetch-data` first.');
+    console.warn('[loadCardData] no data/ directory; returning empty cards array');
+    return { cards: [], filename: null };
   }
 
   const files = fs.readdirSync(dataDir)
@@ -19,7 +20,8 @@ export async function loadCardData() {
     .sort()
     .reverse();
   if (files.length === 0) {
-    throw new Error('No cards-*.json.br found in data/. Run `npm run fetch-data`.');
+    console.warn('[loadCardData] no cards-*.json.br in data/; returning empty cards array (run `npm run fetch-data` to populate)');
+    return { cards: [], filename: null };
   }
 
   const filePath = path.join(dataDir, files[0]);

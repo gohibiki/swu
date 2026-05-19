@@ -1,4 +1,4 @@
-﻿# Full Technical SEO Audit, swutcg.one
+# Full Technical SEO Audit, swutcg.one
 
 **Date:** 2026-05-19
 **URL audited:** https://www.swutcg.one/

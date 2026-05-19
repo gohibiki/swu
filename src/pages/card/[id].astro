@@ -13,16 +13,16 @@ interface Card {
   slug?: string;
   name?: string;
   type?: string;
+  aspects?: string[];
+  aspect?: string;
   color?: string;
   rarity?: string;
   cost?: number | null;
-  level?: number | null;
-  ap?: number | null;
+  power?: number | null;
   hp?: number | null;
-  zone?: string;
+  arena?: string;
+  traits?: string[];
   trait?: string;
-  link?: string;
-  source_title?: string;
   description?: string;
   action?: string;
   set?: string;
@@ -135,7 +135,7 @@ const isLowContent = !card.action && !card.price && !card.tcgPlayerId;
     "sku": card.id,
     "url": cardURL,
     "image": imageUrl,
-    "category": `Star Wars Unlimited ${card.color || ''} ${card.type || ''}`.trim(),
+    "category": `Star Wars Unlimited ${(card.aspects || []).join(' ')} ${card.type || ''}`.trim(),
     "brand": { "@type": "Brand", "name": "Star Wars Unlimited" },
     ...(tcgPrice && tcgPlayerProductUrl ? {
       "offers": {
@@ -230,10 +230,10 @@ const isLowContent = !card.action && !card.price && !card.tcgPlayerId;
               <span class="modal-stat-value">{card.type}</span>
             </div>
           )}
-          {present(card.color) && (
+          {card.aspects && card.aspects.length > 0 && (
             <div class="stat-row">
-              <span class="modal-stat-label">Color</span>
-              <span class="modal-stat-value">{card.color}</span>
+              <span class="modal-stat-label">Aspects</span>
+              <span class="modal-stat-value">{card.aspects.join(' / ')}</span>
             </div>
           )}
           {present(card.rarity) && (
@@ -248,16 +248,10 @@ const isLowContent = !card.action && !card.price && !card.tcgPlayerId;
               <span class="modal-stat-value">{card.cost}</span>
             </div>
           )}
-          {present(card.level) && (
+          {present(card.power) && (
             <div class="stat-row">
-              <span class="modal-stat-label">Lv</span>
-              <span class="modal-stat-value">{card.level}</span>
-            </div>
-          )}
-          {present(card.ap) && (
-            <div class="stat-row">
-              <span class="modal-stat-label">AP</span>
-              <span class="modal-stat-value">{card.ap}</span>
+              <span class="modal-stat-label">Power</span>
+              <span class="modal-stat-value">{card.power}</span>
             </div>
           )}
           {present(card.hp) && (
@@ -266,28 +260,16 @@ const isLowContent = !card.action && !card.price && !card.tcgPlayerId;
               <span class="modal-stat-value">{card.hp}</span>
             </div>
           )}
-          {present(card.zone) && (
+          {present(card.arena) && (
             <div class="stat-row">
-              <span class="modal-stat-label">Zone</span>
-              <span class="modal-stat-value">{card.zone}</span>
+              <span class="modal-stat-label">Arena</span>
+              <span class="modal-stat-value">{card.arena}</span>
             </div>
           )}
-          {present(card.trait) && (
+          {card.traits && card.traits.length > 0 && (
             <div class="stat-row col-span-full">
-              <span class="modal-stat-label">Trait</span>
-              <span class="modal-stat-value">{card.trait}</span>
-            </div>
-          )}
-          {present(card.link) && (
-            <div class="stat-row col-span-full">
-              <span class="modal-stat-label">Link</span>
-              <span class="modal-stat-value">{card.link}</span>
-            </div>
-          )}
-          {present(card.source_title) && (
-            <div class="stat-row col-span-full">
-              <span class="modal-stat-label">Source</span>
-              <span class="modal-stat-value">{card.source_title}</span>
+              <span class="modal-stat-label">Traits</span>
+              <span class="modal-stat-value">{card.traits.join(', ')}</span>
             </div>
           )}
         </div>

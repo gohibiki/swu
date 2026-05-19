@@ -1,4 +1,4 @@
-﻿// Card images are mirrored from dotgg's CDN to public/cards/{id}.webp by
+// Card images are mirrored from dotgg's CDN to public/cards/{id}.webp by
 // scripts/download-images.js (runs daily via GitHub Actions). Cloudflare
 // Pages serves them with a 1-year immutable cache (see public/_headers).
 //

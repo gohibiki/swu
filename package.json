@@ -1,5 +1,5 @@
-﻿{
-  "name": "swutcg-zone",
+{
+  "name": "swutcg",
   "type": "module",
   "version": "0.0.1",
   "description": "Star Wars Unlimited card database",
@@ -10,7 +10,6 @@
     "preview": "astro preview",
     "astro": "astro",
     "fetch-data": "node scripts/fetch-data.js",
-    "fetch-decklists": "node scripts/fetch-decklists.js",
     "download-images": "node scripts/download-images.js"
   },
   "dependencies": {

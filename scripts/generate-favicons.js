@@ -1,4 +1,4 @@
-﻿// One-shot favicon variant generator from public/favicon.svg.
+// One-shot favicon variant generator from public/favicon.svg.
 // Run when the source favicon SVG changes.
 //   node scripts/generate-favicons.js
 //

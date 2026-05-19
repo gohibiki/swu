@@ -1,4 +1,4 @@
-﻿// Mirror Star Wars Unlimited card images from TCGPlayer's CDN to public/cards/{id}.webp.
+// Mirror Star Wars Unlimited card images from TCGPlayer's CDN to public/cards/{id}.webp.
 //
 // Filename:  card.id (which is the Fantasy Flight Games code, plus a _p1/_p2 suffix on
 //            non-canonical printings â€” see fetch-data.js for the

@@ -1,4 +1,4 @@
-﻿// Fetch Star Wars Unlimited catalog from TCGCSV (mirror of TCGplayer's
+// Fetch Star Wars Unlimited catalog from TCGCSV (mirror of TCGplayer's
 // catalog API). TCGCSV is free, no auth, updated daily, and has
 // complete coverage of every set including future ones â€” vs dotgg's
 // partial coverage (capped at GD02).

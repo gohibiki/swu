@@ -1,4 +1,4 @@
-﻿import { faqs } from '../data/faqs.js';
+import { faqs } from '../data/faqs.js';
 
 export async function GET() {
   const baseUrl = 'https://www.swutcg.one';

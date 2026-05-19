@@ -1,4 +1,4 @@
-﻿// Service Worker for swutcg.one â€” Offline support + caching.
+// Service Worker for swutcg.one â€” Offline support + caching.
 // Bump CACHE_VERSION whenever the static asset contract changes; old
 // caches are deleted on activate.
 const CACHE_VERSION = 'swu-v1';

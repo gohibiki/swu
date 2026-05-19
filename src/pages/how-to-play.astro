@@ -1,13 +1,13 @@
-﻿---
+---
 export const prerender = true;
 
 import Layout from '../layouts/Layout.astro';
 import Navigation from '../components/Navigation.astro';
 
 const pageURL = 'https://www.swutcg.one/how-to-play';
-const RULES_PDF = '/swu-comprehensive-rules-1.6.0.pdf';
-const RULES_VERSION = 'v1.6.0';
-const RULES_DATE = 'April 9, 2026';
+const RULES_PDF = 'https://starwarsunlimited.com/rules';
+const RULES_VERSION = 'Comprehensive Rules';
+const RULES_DATE = 'updated by FFG';
 ---
 
 <Layout
@@ -40,7 +40,7 @@ const RULES_DATE = 'April 9, 2026';
     <header>
       <h1>How to Play Star Wars Unlimited - Rules & Keywords</h1>
       <p class="page-intro">
-        <strong>How to play Star Wars Unlimited (Star Wars Unlimited)</strong>: Fantasy Flight Games's two-player trading card game. Five-minute walkthrough covering rules, turn flow, and <strong>keyword effects</strong>. Pair it with the <a href="/database">card database</a>, the <a href="/builder">deck builder</a>, or <a href="/decklists">tournament decklists</a>.
+        <strong>How to play Star Wars Unlimited</strong>: Fantasy Flight Games's two-player trading card game. Five-minute walkthrough covering deck construction, the four phases, the Ground / Space arenas, and SWU's <strong>keyword abilities</strong>. Pair it with the <a href="/database">card database</a>, the <a href="/builder">deck builder</a>, or <a href="/decklists">tournament decklists</a>.
       </p>
     </header>
 
@@ -55,99 +55,99 @@ const RULES_DATE = 'April 9, 2026';
     <section class="rules-section">
       <h2>1. Deck construction</h2>
       <ul>
-        <li><strong>50 cards</strong> in your main deck (Units, Pilots, Commands, and Bases). Reference: rule 6-1-1.</li>
-        <li><strong>10 cards</strong> in your resource deck (Resource cards only). Resources are not in the main deck.</li>
-        <li><strong>One or two colors</strong> only per deck: Blue, Green, Red, or White.</li>
-        <li><strong>Maximum 4 copies</strong> of any card sharing the same card number.</li>
-        <li>Any number of identical Resource cards is allowed in the resource deck.</li>
-        <li>You also need one <strong>EX Base</strong> and one <strong>EX Resource</strong> token at hand.</li>
+        <li><strong>1 Leader</strong> in the Leader area. Your Leader sets your two aspects (one Alignment, one Style).</li>
+        <li><strong>1 Base</strong> in the Base area. Your Base has HP. When it reaches 0, you lose.</li>
+        <li><strong>50 cards minimum</strong> in your main deck (Units, Events, Upgrades). No upper limit, but most competitive lists run exactly 50.</li>
+        <li><strong>Maximum 3 copies</strong> of any card by name.</li>
+        <li>Cards whose aspects all match your Leader play at their printed cost. Off-aspect cards cost <strong>+2 Resources each</strong>.</li>
       </ul>
     </section>
 
     <section class="rules-section">
-      <h2>2. The five card types</h2>
+      <h2>2. Card types</h2>
       <dl class="card-type-list">
-        <dt>Unit</dt>
-        <dd>The fighters. Have <strong>AP</strong> (attack) and <strong>HP</strong> (hit points). Only Units can attack. A newly deployed Unit cannot attack the same turn unless it has a paired Pilot satisfying its Link condition (a "Link Unit"), in which case it can attack immediately.</dd>
-
-        <dt>Pilot</dt>
-        <dd>Placed beneath a Unit and paired with it. Adds AP/HP modifiers and effects to the Unit. A Unit can only have one Pilot at a time. Pilots have traits (e.g. <em>Newtype</em>, <em>Earth Federation</em>).</dd>
-
-        <dt>Command</dt>
-        <dd>One-shot effect cards played in the main phase (<code>[Main]</code>) or action step (<code>[Action]</code>). Some Commands have a Pilot effect on the bottom. Pair them as a Pilot instead of resolving the command.</dd>
+        <dt>Leader</dt>
+        <dd>One per deck. Sits in the Leader zone. Each Leader has a passive ability and an Epic Action that can be used once per game. After triggering its Deploy condition, the Leader flips and enters the Ground arena as a Unit with its own Power and HP.</dd>
 
         <dt>Base</dt>
-        <dd>Deployed into your shield area. While a Base is present, damage to the shield area hits the Base first. Bases have AP and HP.</dd>
+        <dd>One per deck. Sits in the Base zone with a printed HP value (typically 30). Defeating the opponent's Base wins the game.</dd>
 
-        <dt>Resource</dt>
-        <dd>Lives in the resource deck (10 cards). One Resource enters the resource area each turn during the resource phase. This is how you ramp up to pay costs.</dd>
+        <dt>Unit</dt>
+        <dd>The fighters. Have <strong>Power</strong>, <strong>HP</strong>, and an <strong>Arena</strong> (Ground or Space). Units only fight other Units in the same arena, but any Unit can attack the opponent's Base directly. Newly deployed Units have "deployed this turn" and cannot attack unless they have <em>Ambush</em>.</dd>
+
+        <dt>Event</dt>
+        <dd>One-shot spell-like cards. Pay the cost, resolve the effect, place into the discard pile.</dd>
+
+        <dt>Upgrade</dt>
+        <dd>Attached to a Unit. Adds Power, HP, or abilities. When the host Unit is defeated, attached Upgrades are also discarded.</dd>
       </dl>
     </section>
 
     <section class="rules-section">
       <h2>3. Turn flow</h2>
+      <p>SWU uses an action-based system: players alternate single actions until both pass. There are four high-level phases per round.</p>
       <ol>
-        <li><strong>Start phase</strong>: active effects trigger, all your rested cards become active.</li>
-        <li><strong>Draw phase</strong>: draw one card from your deck. (Player 1 skips this on turn 1.)</li>
-        <li><strong>Resource phase</strong>:place one Resource card from your resource deck into your resource area.</li>
-        <li><strong>Main phase</strong>: deploy Units, pair Pilots, deploy Bases, play <code>[Main]</code> Commands, activate <code>Activateãƒ»Main</code> effects, and declare attacks with your Units.</li>
-        <li><strong>End phase</strong>:<code>&lt;Repair&gt;</code> triggers, end-of-turn effects resolve.</li>
+        <li><strong>Action Phase</strong>: players alternate one action at a time (play a card, attack, use an ability, take a Resource, or pass). The phase ends when both players pass consecutively.</li>
+        <li><strong>Regroup Phase</strong>: ready (untap) all exhausted cards, draw two cards (skipped on turn 1 by the initiative player), then optionally smuggle a card from hand to be a Resource face-down. Hand size resets if needed.</li>
+        <li><strong>Initiative Claim</strong>: the player without initiative may claim it for the next round (forcing them to go second), or pass.</li>
+        <li><strong>Next round</strong>: resume action phase with the initiative player going first.</li>
       </ol>
     </section>
 
     <section class="rules-section">
-      <h2>4. Attacking and battles</h2>
+      <h2>4. Attacking and combat</h2>
       <p>
-        A Unit attacks by resting (rotating) itself and targeting either an enemy Unit or directly into the opponent's shield area. The defender may declare an action step in response, then resolve the battle:
+        Units attack other Units in the same arena, or attack the opponent's Base. To attack, exhaust the attacker, declare the target, and resolve combat:
       </p>
       <ul>
-        <li>Both Units deal battle damage equal to their AP simultaneously.</li>
-        <li>If a Unit's HP reaches zero, it is destroyed and placed into the trash.</li>
-        <li>If damage hits the shield area, it destroys the top shield (or the Base if one is deployed). Destroyed shields reveal their <code>[Burst]</code> effect. The owner may activate it for free.</li>
-        <li>When all six starting shields are gone and an enemy Unit lands one more point of battle damage, the defender loses.</li>
+        <li>Both Units deal damage equal to their Power simultaneously.</li>
+        <li>If a Unit's HP is met or exceeded by accumulated damage, it is defeated and goes to the discard pile.</li>
+        <li>When attacking a Base, the attacker takes no return damage. All Power goes to the Base. <em>Overwhelm</em> lets a Unit attacking another Unit deal excess damage to the Base.</li>
+        <li>When the opponent's Base HP reaches zero, you win.</li>
       </ul>
     </section>
 
     <section class="rules-section">
-      <h2>5. Keyword effects</h2>
-      <p>Most cards reference one or more keyword effects. The seven core keywords from the comprehensive rules:</p>
+      <h2>5. Keyword abilities</h2>
+      <p>Keywords on cards reference standard rules text:</p>
       <dl class="keyword-list">
-        <dt><code>&lt;Repair X&gt;</code></dt>
-        <dd>At the end of your turn, this Unit recovers X HP.</dd>
+        <dt><strong>Ambush</strong></dt>
+        <dd>This Unit can attack and use action abilities the turn it is deployed.</dd>
 
-        <dt><code>&lt;Breach X&gt;</code></dt>
-        <dd>When this Unit destroys an enemy Unit with battle damage, deal X damage to the top of the opponent's shield area (the Base, if any, or the topmost shield).</dd>
+        <dt><strong>Grit</strong></dt>
+        <dd>This Unit's Power is increased by the amount of damage on it.</dd>
 
-        <dt><code>&lt;Support X&gt;</code></dt>
-        <dd>You may rest this Unit during your main phase to give one other friendly Unit AP+X this turn.</dd>
+        <dt><strong>Overwhelm</strong></dt>
+        <dd>If this Unit's combat damage to another Unit exceeds the defender's remaining HP, the excess is dealt to the opponent's Base.</dd>
 
-        <dt><code>&lt;Blocker&gt;</code></dt>
-        <dd>When an enemy Unit attacks, you may rest this Unit to redirect the attack to it.</dd>
+        <dt><strong>Raid X</strong></dt>
+        <dd>When this Unit attacks a Base, it gets +X Power for that attack.</dd>
 
-        <dt><code>&lt;First Strike&gt;</code></dt>
-        <dd>When attacking, this Unit deals battle damage before the defender. Destroying the defender first cancels their return damage.</dd>
+        <dt><strong>Restore X</strong></dt>
+        <dd>When this Unit attacks a Base, heal up to X damage from your own Base.</dd>
 
-        <dt><code>&lt;High-Maneuver&gt;</code></dt>
-        <dd>While this Unit is attacking, enemy Units cannot activate <code>&lt;Blocker&gt;</code>.</dd>
+        <dt><strong>Saboteur</strong></dt>
+        <dd>This Unit ignores opposing <em>Sentinel</em> Units when choosing attack targets.</dd>
 
-        <dt><code>&lt;Suppression&gt;</code></dt>
-        <dd>When this Unit deals battle damage to a shield, damage the top two shields simultaneously (Bursts on both still trigger).</dd>
+        <dt><strong>Sentinel</strong></dt>
+        <dd>Enemy Units must attack this Unit if able. Saboteur bypasses this restriction.</dd>
+
+        <dt><strong>Shielded</strong></dt>
+        <dd>When this Unit is deployed, it gains a Shield token (negates the next damage taken, then is discarded).</dd>
+
+        <dt><strong>Smuggle</strong></dt>
+        <dd>You may play this card from a face-down Resource at the cost shown next to "Smuggle".</dd>
       </dl>
     </section>
 
     <section class="rules-section">
-      <h2>6. Timing keywords</h2>
-      <p>Brackets like <code>[Deploy]</code> or <code>[Attack]</code> on card text mark when an effect triggers:</p>
+      <h2>6. Aspects (the deckbuilding rule)</h2>
+      <p>Every card has zero, one, or two aspects out of the six total:</p>
       <ul>
-        <li><code>[Deploy]</code>: activates when the card is deployed.</li>
-        <li><code>[Attack]</code>: activates when the Unit declares an attack.</li>
-        <li><code>[Destroyed]</code>: activates when the Unit or Base is destroyed.</li>
-        <li><code>[Burst]</code>: activates when this card, while a shield, is destroyed. Free to activate.</li>
-        <li><code>[Main]</code> / <code>[Action]</code>: when this Command can be played.</li>
-        <li><code>[When Paired]</code>: activates when a Pilot is paired with a Unit.</li>
-        <li><code>[During Pair]</code>: passive effect on a Unit while a Pilot is paired with it.</li>
-        <li><code>Activateãƒ»Main</code> / <code>Activateãƒ»Action</code>: repeatable activated effects, usable in the named phase.</li>
+        <li><strong>Alignment aspects</strong>: <em>Heroism</em>, <em>Villainy</em>. Each card has at most one.</li>
+        <li><strong>Style aspects</strong>: <em>Vigilance</em>, <em>Cunning</em>, <em>Aggression</em>, <em>Command</em>. Each card has at most one.</li>
       </ul>
+      <p>Your Leader has two aspects. Cards that share <strong>all</strong> their aspects with your Leader play at printed cost. Each aspect a card has that your Leader does not adds <strong>+2 to the cost</strong> when you play it. This penalty is what makes mono-aspect decks faster and dual-aspect decks more flexible.</p>
     </section>
 
     <section class="rules-cta">

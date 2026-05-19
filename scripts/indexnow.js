@@ -1,4 +1,4 @@
-﻿/**
+/**
  * IndexNow submission script (Bing/Yandex/etc.).
  * Fetches URLs from sitemap and streams them to the IndexNow API.
  * Run after build: node scripts/indexnow.js

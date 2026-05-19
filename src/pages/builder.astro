@@ -1,4 +1,4 @@
-﻿---
+---
 export const prerender = true;
 
 import Layout from '../layouts/Layout.astro';
@@ -61,7 +61,7 @@ const compact = cards.map(c => ({
 // 100-150KB for a feature most users never trigger.
 
 const totalCards = cards.length;
-const description = `Star Wars Unlimited deck builder. Build a 50-card main deck plus 10-card resource deck with ${totalCards.toLocaleString()} cards. Import/export, color and copy limits enforced.`;
+const description = `Star Wars Unlimited deck builder. Build a Leader + Base + 50-card minimum main deck with ${totalCards.toLocaleString()} cards. Import/export, aspect and copy limits enforced.`;
 ---
 
 <Layout
@@ -83,7 +83,7 @@ const description = `Star Wars Unlimited deck builder. Build a 50-card main deck
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
     "featureList": [
       "Full card pool with live filtering",
-      "Real-time deck validation (50-card main + 10-card resource)",
+      "Real-time deck validation (Leader + Base + 50-card minimum main deck, max 3 copies)",
       "Color and copy-limit enforcement",
       "Import / export decklists",
       "URL-shareable decks"
@@ -94,7 +94,7 @@ const description = `Star Wars Unlimited deck builder. Build a 50-card main deck
     <Navigation activePage="builder" />
     <h1>Star Wars Unlimited Deck Builder</h1>
     <p class="page-intro">
-      <strong>Star Wars Unlimited deck builder</strong> for the 50-card main + 10-card resource format. <a href="/database">{totalCards.toLocaleString()} cards</a> in the pool. Copy <a href="/decklists">tournament decklists</a> or read <a href="/how-to-play">the rules</a> first.
+      <strong>Star Wars Unlimited deck builder</strong> for the Leader + Base + 50-card minimum main deck format. <a href="/database">{totalCards.toLocaleString()} cards</a> in the pool. Copy <a href="/decklists">tournament decklists</a> or read <a href="/how-to-play">the rules</a> first.
     </p>
   </header>
 
@@ -105,7 +105,7 @@ const description = `Star Wars Unlimited deck builder. Build a 50-card main deck
         <h2 id="deck-area-heading" class="sr-only">Your deck</h2>
 
         <div class="deck-controls">
-          <h3 class="deck-main-title">Main deck <span class="deck-count" id="mainCount">0/50</span></h3>
+          <h3 class="deck-main-title">Main deck <span class="deck-count" id="mainCount">0 (50 min)</span></h3>
           <div class="deck-controls-buttons">
             <button class="deck-btn" id="importBtn" type="button">Import</button>
             <button class="deck-btn" id="exportBtn" type="button">Export</button>
@@ -143,7 +143,7 @@ const description = `Star Wars Unlimited deck builder. Build a 50-card main deck
     <div class="mobile-tab-switch" role="tablist">
       <button type="button" class="mobile-tab active" data-tab="cards" role="tab">Cards</button>
       <button type="button" class="mobile-tab" data-tab="deck" role="tab">
-        Deck <span class="mobile-tab-count" id="mobileTabCount">0/50</span>
+        Deck <span class="mobile-tab-count" id="mobileTabCount">0 (50 min)</span>
       </button>
     </div>
   </main>
@@ -176,7 +176,7 @@ const description = `Star Wars Unlimited deck builder. Build a 50-card main deck
     <div class="modal-content modal-content-narrow">
       <button type="button" class="modal-close" id="ioClose" aria-label="Close">&times;</button>
       <h2 id="ioTitle">Import / Export</h2>
-      <p class="io-help">One card per line as <code>QTY ID</code> (e.g. <code>4 ST01-005</code>). Resource deck after a blank line.</p>
+      <p class="io-help">One card per line as <code>QTY ID</code> (e.g. <code>3 SOR-005</code>). Leader and Base on the first two lines.</p>
       <textarea id="ioTextarea" class="io-textarea" rows="20" spellcheck="false"></textarea>
       <div class="io-actions">
         <button type="button" class="deck-btn" id="ioCopyBtn">Copy</button>
@@ -191,10 +191,10 @@ const description = `Star Wars Unlimited deck builder. Build a 50-card main deck
       // CONFIG (matches the comprehensive rules v1.6.0 Â§6-1)
       // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const CONFIG = {
-        MAIN_SIZE: 50,
-        RESOURCE_SIZE: 10,
-        MAX_COPIES: 4,
-        MAX_COLORS: 2,
+        MAIN_SIZE: 50,    // minimum main deck size for SWU (no maximum)
+        RESOURCE_SIZE: 0, // SWU has no separate resource deck (Leader + Base instead)
+        MAX_COPIES: 3,    // SWU rule 6-1: max 3 copies of any card by name
+        MAX_COLORS: 6,    // SWU has 6 aspects; no hard color cap, but penalties apply
         POOL_PAGE: 60,    // cards per page in the pool grid
       };
 

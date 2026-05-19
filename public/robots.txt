@@ -1,4 +1,4 @@
-﻿# robots.txt for swutcg.one â€” Star Wars Unlimited Database
+# robots.txt for swutcg.one â€” Star Wars Unlimited Database
 # https://www.swutcg.one/robots.txt
 
 Sitemap: https://www.swutcg.one/sitemap.xml

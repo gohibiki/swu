@@ -1,12 +1,17 @@
 ---
-import { COLORS, CARD_TYPES, ABILITIES } from '../utils/cardConstants.js';
+import { ASPECTS, CARD_TYPES, ABILITIES, ARENAS } from '../utils/cardConstants.js';
 
 const TYPE_LETTERS: Record<string, string> = {
-  Unit: 'U',
-  Pilot: 'P',
-  Command: 'C',
-  Base: 'B',
-  Resource: 'R'
+  Leader:  'L',
+  Base:    'B',
+  Unit:    'U',
+  Event:   'E',
+  Upgrade: 'P'   // P for "uPgrade" since U is taken
+};
+
+const ARENA_LETTERS: Record<string, string> = {
+  Ground: 'G',
+  Space:  'S'
 };
 ---
 
@@ -16,23 +21,25 @@ const TYPE_LETTERS: Record<string, string> = {
       type="text"
       id="searchBar"
       class="search-bar"
-      placeholder="Search by name, ID (GD04-001), trait, or effect text..."
+      placeholder="Search by name, ID (SOR-001), trait, or effect text..."
       aria-label="Search cards"
       autocomplete="off"
       autocorrect="off"
       autocapitalize="off"
       spellcheck="false"
     />
-    <div class="color-filter top-color-filter" role="group" aria-label="Filter by color">
-      {COLORS.map(color => (
+    <div class="color-filter top-color-filter" role="group" aria-label="Filter by aspect">
+      {ASPECTS.map(aspect => (
         <div
-          class={`filter-chip color-chip ${color.key.toLowerCase()}`}
-          data-ink={color.key.toLowerCase()}
+          class={`filter-chip color-chip ${aspect.key.toLowerCase()}`}
+          data-ink={aspect.key.toLowerCase()}
+          data-aspect={aspect.key}
           role="button"
           tabindex="0"
-          aria-label={`Filter by ${color.label}`}
+          aria-label={`Filter by ${aspect.label}`}
           aria-pressed="false"
-          title={color.label}
+          title={aspect.label}
+          style={`--aspect-hex: ${aspect.hex}`}
         ></div>
       ))}
     </div>
@@ -82,6 +89,20 @@ const TYPE_LETTERS: Record<string, string> = {
         aria-label="Filter by cost 10 or more"
         aria-pressed="false"
       >10+</div>
+    </div>
+
+    <div class="arena-filter" role="group" aria-label="Filter by arena">
+      {ARENAS.map(arena => (
+        <div
+          class="filter-chip arena-chip"
+          data-arena={arena}
+          role="button"
+          tabindex="0"
+          aria-label={`Filter by ${arena} arena`}
+          aria-pressed="false"
+          title={`${arena} arena`}
+        >{ARENA_LETTERS[arena]}</div>
+      ))}
     </div>
 
     <div class="ability-filter" role="group" aria-label="Filter by keyword ability">
